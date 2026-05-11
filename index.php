@@ -1,9 +1,13 @@
 <?php
 
+//GLOBAL VAR
+$head_on_route = "";
+$body_on_route = "";
+
 //DATABASE
 
 //database credientials
-$database__url = "localhost:3306";
+$database_url = "localhost:3306";
 $database_name = "coffee";
 $database_username = "root";
 $database_password = "";
@@ -17,7 +21,7 @@ $connection = mysqli_connect(
 );
 
 if (!$connection) {
-    die("Connection Failed :" . mysqli_connect_error());
+    [$head_on_route, $body_on_route] = fiveHundred();
 }
 
 session_start();
@@ -26,10 +30,6 @@ session_start();
 
 $uri = $_SERVER["REQUEST_URI"];
 
-$head_on_route = "";
-$body_on_route = "";
-
-$slug = "";
 switch ($uri) {
     case "":
     case "/":
@@ -42,6 +42,9 @@ switch ($uri) {
 
     case "/adminlogin":
         [$head_on_route, $body_on_route] = adminLogin();
+        break;
+    case "/logout":
+        logout();
         break;
     default:
         $slug = trim($uri, "/");
@@ -87,12 +90,24 @@ function coffee($slug)
 
 function admin()
 {
+    if (
+        !isset($_SESSION["admin_logged_in"], $_SESSION["admin_username"]) ||
+        ($_SESSION["admin_logged_in"] == !true &&
+            $_SESSION["admin_username"] != "SurajKumal")
+    ) {
+        header("Location: /adminlogin");
+        exit();
+    }
     $head = <<<HTML
     <title>Admin Page</title>
     HTML;
 
     $body = <<<HTML
     <h1>admin</h1>
+
+    <form action="/logout" method="POST">
+        <button>Logout</button>
+    </form>
     HTML;
 
     return [$head, $body];
@@ -109,7 +124,7 @@ function adminLogin()
 
         if ($user == $adminLogin && $pass == $adminPassword) {
             $_SESSION["admin_logged_in"] = true;
-            $_SESSION["admin_username"] = $user;
+            $_SESSION["admin_username"] = "SurajKumal";
             header("Location: /admin");
             exit();
         } else {
@@ -123,6 +138,7 @@ function adminLogin()
 
     $body = <<<HTML
             <h1>Admin Login</h1>
+
             <form action="/adminlogin" method="post">
                 <Input type="text" placeholder="username" name="username" required>
                 <Input type="password" placeholder="password" name="password" required>
@@ -133,12 +149,36 @@ function adminLogin()
     return [$head, $body];
 }
 
+function logout()
+{
+    if ($_SERVER["REQUEST_METHOD"] == "POST") {
+        // Destroy only the specific admin session variables
+        unset($_SESSION["admin_logged_in"]);
+        unset($_SESSION["admin_username"]);
+        header("Location: /adminlogin");
+        exit();
+    }
+}
+
 function fourZeroFour()
 {
     $head = "";
     $body = <<<HTML
         <h1>404 not found <h1>
     HTML;
+    return [$head, $body];
+}
+
+function fiveHundred()
+{
+    $head = <<<HTML
+        <title>Internal Server Error </title>
+    HTML;
+
+    $body = <<<HTML
+        <h1>Internal Server Error </title>
+    HTML;
+
     return [$head, $body];
 }
 ?>
@@ -160,7 +200,7 @@ function fourZeroFour()
         </style>
     </head>
     <body >
-        <h1 class="text-3xl">coffee shop </h1>
+        <h1 class="text-3xl">COFFEEMANDU </h1>
         <?php echo $body_on_route; ?>
     </body>
 </html>

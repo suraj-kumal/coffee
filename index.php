@@ -3,6 +3,10 @@
 //GLOBAL VAR
 $head_on_route = "";
 $body_on_route = "";
+$admin = "/admin";
+$adminLogin = "/adminlogin";
+$create = "/admin/create";
+$edit = "/admin/edit";
 
 //DATABASE
 
@@ -36,11 +40,11 @@ switch ($uri) {
         [$head_on_route, $body_on_route] = home();
         break;
 
-    case "/admin":
+    case $admin:
         [$head_on_route, $body_on_route] = admin();
         break;
 
-    case "/adminlogin":
+    case $adminLogin:
         [$head_on_route, $body_on_route] = adminLogin();
         break;
     case "/logout":
@@ -50,8 +54,27 @@ switch ($uri) {
         $slug = trim($uri, "/");
         [$head_on_route, $body_on_route] = coffee($slug);
 }
-
 //todo change to switch in future
+
+//Middleware
+function coffee($slug)
+{
+    $coffeeSlug = "test";
+    $which_city = "kathmandu";
+
+    // city route
+    if ($slug === $which_city) {
+        return cityBased($slug);
+    }
+
+    // coffee route
+    if ($slug === $coffeeSlug) {
+        return slugBased($slug);
+    }
+
+    // fallback
+    return fourZeroFour();
+}
 
 //FUNCTIONS RENDERING HTML AND SERVER SIDE LOGIC
 //
@@ -59,7 +82,7 @@ switch ($uri) {
 function home()
 {
     $head = <<<HTML
-    <title>Best Coffee shops in Kathmandu</title>
+    <title>Coffeemandu - your goto coffee shop directory</title>
 
     HTML;
 
@@ -70,19 +93,33 @@ function home()
     return [$head, $body];
 }
 
-function coffee($slug)
+function cityBased($slug)
 {
-    $coffeeSlug = "test";
-
-    if ($slug !== $coffeeSlug) {
-        return fourZeroFour();
-    }
+    //city logic
     $head = <<<HTML
-        <title> test</title>
+    <title>Best Coffee shops in $slug</title>
+
     HTML;
 
     $body = <<<HTML
-        <p>test</p>
+    <h1> Kathmandu </h1>
+    HTML;
+
+    return [$head, $body];
+}
+
+function slugBased($slug)
+{
+    //slug logic
+
+    $slug_to_db = $slug;
+    $head = <<<HTML
+    <title>slug test</title>
+
+    HTML;
+
+    $body = <<<HTML
+    <h1> slug </h1>
     HTML;
 
     return [$head, $body];
@@ -159,6 +196,10 @@ function logout()
         exit();
     }
 }
+
+function create() {}
+
+function edit() {}
 
 function fourZeroFour()
 {

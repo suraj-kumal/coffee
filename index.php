@@ -47,6 +47,12 @@ switch ($uri) {
     case $adminLogin:
         [$head_on_route, $body_on_route] = adminLogin();
         break;
+    case $create:
+        [$head_on_route, $body_on_route] = create();
+        break;
+    case $edit:
+        [$head_on_route, $body_on_route] = edit();
+        break;
     case "/logout":
         logout();
         break;
@@ -76,6 +82,18 @@ function coffee($slug)
     return fourZeroFour();
 }
 
+function authGuard()
+{
+    if (
+        !isset($_SESSION["admin_logged_in"], $_SESSION["admin_username"]) ||
+        ($_SESSION["admin_logged_in"] == !true &&
+            $_SESSION["admin_username"] != "SurajKumal")
+    ) {
+        header("Location: /adminlogin");
+        exit();
+    }
+    return true;
+}
 //FUNCTIONS RENDERING HTML AND SERVER SIDE LOGIC
 //
 
@@ -127,14 +145,9 @@ function slugBased($slug)
 
 function admin()
 {
-    if (
-        !isset($_SESSION["admin_logged_in"], $_SESSION["admin_username"]) ||
-        ($_SESSION["admin_logged_in"] == !true &&
-            $_SESSION["admin_username"] != "SurajKumal")
-    ) {
-        header("Location: /adminlogin");
-        exit();
-    }
+    authGuard();
+
+    $_SESSION["edit"] = 4;
     $head = <<<HTML
     <title>Admin Page</title>
     HTML;
@@ -197,9 +210,40 @@ function logout()
     }
 }
 
-function create() {}
+function create()
+{
+    authGuard();
 
-function edit() {}
+    $head = <<<HTML
+        <title>create </title>
+    HTML;
+
+    $body = <<<HTML
+
+    <p>create</p>
+
+    HTML;
+
+    return [$head, $body];
+}
+
+function edit()
+{
+    authGuard();
+
+    $id = $_SESSION["edit"];
+
+    echo $id;
+    $head = <<<HTML
+        <title>edit </title>
+    HTML;
+
+    $body = <<<HTML
+        <p> edit </p>
+    HTML;
+
+    return [$head, $body];
+}
 
 function fourZeroFour()
 {

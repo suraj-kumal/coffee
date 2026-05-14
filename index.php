@@ -168,17 +168,257 @@ function admin()
 {
     authGuard();
 
-    $_SESSION["edit"] = 4;
+    global $pdo;
+    global $admin;
+    global $create_admin_route;
+    global $edit_admin_route;
+
+    // Edit button clicked
+    if (isset($_POST["editId"])) {
+        $_SESSION["editId"] = $_POST["editId"];
+
+        header("Location: $edit_admin_route");
+        exit();
+    }
+
+    // Delete button clicked
+    if (isset($_POST["deleteId"])) {
+        $id = $_POST["deleteId"];
+
+        try {
+            // Get slug first
+            $stmt = $pdo->prepare("
+                SELECT slug
+                FROM drink_coffee
+                WHERE id = :id
+            ");
+
+            $stmt->execute([
+                ":id" => $id,
+            ]);
+
+            $coffee = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            if (!$coffee) {
+                throw new Exception("Coffee not found");
+            }
+
+            $slug = $coffee["slug"];
+
+            // Delete DB row
+            $stmt = $pdo->prepare("
+                DELETE FROM drink_coffee
+                WHERE id = :id
+            ");
+
+            $stmt->execute([
+                ":id" => $id,
+            ]);
+
+            // Remove JSON
+            deleteCoffee($slug);
+
+            header("Location: $admin");
+            exit();
+        } catch (PDOException $e) {
+            echo "Database Error: " . $e->getMessage();
+        } catch (Exception $e) {
+            echo "Error: " . $e->getMessage();
+        }
+    }
+
+    // Fetch coffees
+    $stmt = $pdo->query("
+        SELECT id, name, city, slug, published
+        FROM drink_coffee
+        ORDER BY id DESC
+    ");
+
+    $coffees = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+    $rows = "";
+
+    foreach ($coffees as $coffee) {
+        $id = $coffee["id"];
+
+        $name = htmlspecialchars($coffee["name"]);
+        $city = htmlspecialchars($coffee["city"]);
+        $slug = htmlspecialchars($coffee["slug"]);
+
+        $published = $coffee["published"]
+            ? "<span class='inline-flex items-center rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-400'>Published</span>"
+            : "<span class='inline-flex items-center rounded-full border border-yellow-500/30 bg-yellow-500/10 px-3 py-1 text-xs font-semibold text-yellow-400'>Draft</span>";
+
+        $rows .= "
+                <tr class='transition hover:bg-zinc-800/60'>
+
+                    <td class='px-6 py-4 text-sm text-zinc-400'>$id</td>
+
+                    <td class='px-6 py-4 font-medium text-white'>
+                        $name
+                    </td>
+
+                    <td class='px-6 py-4 text-zinc-300'>
+                        $city
+                    </td>
+
+                    <td class='px-6 py-4 text-zinc-500'>
+                        $slug
+                    </td>
+
+                    <td class='px-6 py-4'>
+                        $published
+                    </td>
+
+                    <td class='px-6 py-4'>
+
+                        <form method='POST'>
+
+                            <button
+                                type='submit'
+                                name='editId'
+                                value='$id'
+                                class='rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-blue-500'
+                            >
+                                Edit
+                            </button>
+
+                        </form>
+
+                    </td>
+
+                    <td class='px-6 py-4'>
+
+                        <form
+                            method='POST'
+                            onsubmit='return confirm(\"Delete coffee?\")'
+                        >
+
+                            <button
+                                type='submit'
+                                name='deleteId'
+                                value='$id'
+                                class='rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-red-500'
+                            >
+                                Delete
+                            </button>
+
+                        </form>
+
+                    </td>
+
+                </tr>
+            ";
+    }
+
     $head = <<<HTML
     <title>Admin Page</title>
     HTML;
 
     $body = <<<HTML
-    <h1>admin</h1>
 
-    <form action="/logout" method="POST">
-        <button>Logout</button>
-    </form>
+    <div class="min-h-screen bg-zinc-950 p-8 text-white">
+
+        <div class="mx-auto max-w-7xl">
+
+            <!-- Header -->
+            <div class="mb-8 flex items-center justify-between">
+
+                <div>
+                    <h1 class="text-4xl font-bold tracking-tight text-white">
+                        Admin Dashboard
+                    </h1>
+
+                    <p class="mt-2 text-zinc-400">
+                        Manage your coffee entries
+                    </p>
+                </div>
+
+                <a
+                    href="$create_admin_route"
+                    class="rounded-xl bg-emerald-500 px-5 py-3 text-sm font-semibold text-black shadow-lg transition hover:bg-emerald-400"
+                >
+                    + Create Coffee
+                </a>
+
+            </div>
+
+            <!-- Table Container -->
+            <div class="overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900 shadow-2xl">
+
+                <div class="overflow-x-auto">
+
+                    <table class="min-w-full">
+
+                        <!-- Table Head -->
+                        <thead class="border-b border-zinc-800 bg-zinc-950">
+
+                            <tr>
+
+                                <th class="px-6 py-4 text-left text-sm font-semibold uppercase tracking-wider text-zinc-400">
+                                    ID
+                                </th>
+
+                                <th class="px-6 py-4 text-left text-sm font-semibold uppercase tracking-wider text-zinc-400">
+                                    Name
+                                </th>
+
+                                <th class="px-6 py-4 text-left text-sm font-semibold uppercase tracking-wider text-zinc-400">
+                                    City
+                                </th>
+
+                                <th class="px-6 py-4 text-left text-sm font-semibold uppercase tracking-wider text-zinc-400">
+                                    Slug
+                                </th>
+
+                                <th class="px-6 py-4 text-left text-sm font-semibold uppercase tracking-wider text-zinc-400">
+                                    Status
+                                </th>
+
+                                <th class="px-6 py-4 text-left text-sm font-semibold uppercase tracking-wider text-zinc-400">
+                                    Edit
+                                </th>
+
+                                <th class="px-6 py-4 text-left text-sm font-semibold uppercase tracking-wider text-zinc-400">
+                                    Delete
+                                </th>
+
+                            </tr>
+
+                        </thead>
+
+                        <!-- Table Body -->
+                        <tbody class="divide-y divide-zinc-800">
+
+                            $rows
+
+                        </tbody>
+
+                    </table>
+
+                </div>
+
+            </div>
+
+            <!-- Logout -->
+            <div class="mt-8">
+
+                <form action="/logout" method="POST">
+
+                    <button
+                        class="rounded-xl border border-zinc-700 bg-zinc-900 px-5 py-3 text-sm font-semibold text-zinc-300 transition hover:border-red-500 hover:bg-red-500 hover:text-white"
+                    >
+                        Logout
+                    </button>
+
+                </form>
+
+            </div>
+
+        </div>
+
+    </div>
+
     HTML;
 
     return [$head, $body];
@@ -208,13 +448,79 @@ function adminLogin()
     HTML;
 
     $body = <<<HTML
-            <h1>Admin Login</h1>
 
-            <form action="/adminlogin" method="post">
-                <Input type="text" placeholder="username" name="username" required>
-                <Input type="password" placeholder="password" name="password" required>
-                <Input type="submit" value="login">
+    <div class="flex min-h-screen items-center justify-center bg-zinc-950 px-6">
+
+        <div class="w-full max-w-md rounded-2xl border border-zinc-800 bg-zinc-900 p-8 shadow-2xl">
+
+            <!-- Header -->
+            <div class="mb-8 text-center">
+
+                <h1 class="text-4xl font-bold tracking-tight text-white">
+                    Admin Login
+                </h1>
+
+                <p class="mt-2 text-zinc-400">
+                    Sign in to access the dashboard
+                </p>
+
+            </div>
+
+            <!-- Form -->
+            <form action="/adminlogin" method="POST" class="space-y-5">
+
+                <!-- Username -->
+                <div>
+
+                    <label class="mb-2 block text-sm font-medium text-zinc-300">
+                        Username
+                    </label>
+
+                    <input
+                        type="text"
+                        name="username"
+                        placeholder="Enter username"
+                        required
+                        class="w-full rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-white placeholder:text-zinc-500 outline-none transition focus:border-emerald-500"
+                    >
+
+                </div>
+
+                <!-- Password -->
+                <div>
+
+                    <label class="mb-2 block text-sm font-medium text-zinc-300">
+                        Password
+                    </label>
+
+                    <input
+                        type="password"
+                        name="password"
+                        placeholder="Enter password"
+                        required
+                        class="w-full rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-white placeholder:text-zinc-500 outline-none transition focus:border-emerald-500"
+                    >
+
+                </div>
+
+                <!-- Submit -->
+                <div class="pt-2">
+
+                    <button
+                        type="submit"
+                        class="w-full rounded-xl bg-emerald-500 px-6 py-4 text-sm font-semibold text-black transition hover:bg-emerald-400"
+                    >
+                        Login
+                    </button>
+
+                </div>
+
             </form>
+
+        </div>
+
+    </div>
+
     HTML;
 
     return [$head, $body];
@@ -231,11 +537,13 @@ function logout()
     }
 }
 
+//create route for admin
 function create()
 {
     authGuard();
     global $create_admin_route;
     global $pdo;
+    global $admin;
 
     if ($_SERVER["REQUEST_METHOD"] == "POST") {
         $name = $_POST["name"];
@@ -289,32 +597,37 @@ function create()
                        :published
                    )
                ";
-        $stmt = $pdo->prepare($sql);
-        $stmt->execute([
-            ":name" => $name,
-            ":slug" => $slug,
-            ":location" => $location,
-            ":city" => $city,
-            ":cover_image" => $cover_image,
-            ":excerpt" => $excerpt,
-            ":description" => $description,
-            ":conclusion" => $conclusion,
-            ":instagram" => $instagram,
-            ":website" => $website,
-            ":meta_title" => $meta_title,
-            ":meta_description" => $meta_description,
-            ":meta_keywords" => $meta_keywords,
-            ":published" => $published,
-        ]);
+        try {
+            $stmt = $pdo->prepare($sql);
 
-        // Get the ID of the newly inserted row
-        $newId = $pdo->lastInsertId();
-        // save slug in JSON
-        addCoffee($newId, $slug);
+            $stmt->execute([
+                ":name" => $name,
+                ":slug" => $slug,
+                ":location" => $location,
+                ":city" => $city,
+                ":cover_image" => $cover_image,
+                ":excerpt" => $excerpt,
+                ":description" => $description,
+                ":conclusion" => $conclusion,
+                ":instagram" => $instagram,
+                ":website" => $website,
+                ":meta_title" => $meta_title,
+                ":meta_description" => $meta_description,
+                ":meta_keywords" => $meta_keywords,
+                ":published" => $published,
+            ]);
 
-        echo "New coffee added successfully!";
-        echo "<br>ID: " . $newId;
-        echo "<br>Slug: " . $slug;
+            $newId = $pdo->lastInsertId();
+
+            addCoffee($newId, $slug);
+
+            header("Location: $admin");
+
+            echo "$name added sucessfully";
+            exit();
+        } catch (PDOException $e) {
+            echo "Database Error: " . $e->getMessage();
+        }
     }
 
     $head = <<<HTML
@@ -323,40 +636,270 @@ function create()
 
     $body = <<<HTML
 
-    <p>create</p>
+    <div class="min-h-screen bg-zinc-950 px-6 py-10 text-white">
 
-    <form action="$create_admin_route" method="post">
-        <label for="publish">Choose to publish</label>
-        <select name="published" id="publish">
-          <option value="true">Publish</option>
-          <option value="false" selected>Draft</option>
-        </select>
-        <Input type="text" name="name" placeholder="name" required><br>
-        <Input type="text" name="location" placeholder="location" required><br>
-        <Input type="text" name="city" placeholder="city" required><br>
-        <Input type="text" name="cover_image" placeholder="cover image" required><br>
+        <div class="mx-auto max-w-4xl">
 
-        <textarea name="excerpt" rows="5" cols="66">
-            ........
-        </textarea><br>
-        <textarea name="description" rows="5" cols="66">
-            ........
-        </textarea><br>
-        <textarea name="conclusion" rows="5" cols="66">
-            ........
-        </textarea><br>
+            <!-- Header -->
+            <div class="mb-8">
 
-        <Input type="text" name="instagram" placeholder="instagram"><br>
-        <Input type="text" name="website" placeholder="website"><br>
-        <Input type="text" name="meta_title" placeholder="meta title"><br>
+                <h1 class="text-4xl font-bold tracking-tight text-white">
+                    Create Coffee
+                </h1>
 
-        <Input type="text" name="meta_desc" placeholder="meta description"><br>
+                <p class="mt-2 text-zinc-400">
+                    Add a new coffee shop entry
+                </p>
 
-        <Input type="text" name="meta_keywords" placeholder="meta keywords"><br>
+            </div>
 
+            <!-- Form Card -->
+            <div class="rounded-2xl border border-zinc-800 bg-zinc-900 p-8 shadow-2xl">
 
-        <Input type="submit" value="button">
-    </form>
+                <form action="$create_admin_route" method="POST" class="space-y-6">
+
+                    <!-- Publish -->
+                    <div>
+
+                        <label
+                            for="publish"
+                            class="mb-2 block text-sm font-medium text-zinc-300"
+                        >
+                            Publish Status
+                        </label>
+
+                        <select
+                            name="published"
+                            id="publish"
+                            class="w-full rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-white outline-none transition focus:border-emerald-500"
+                        >
+                            <option value="true">
+                                Publish
+                            </option>
+
+                            <option value="false" selected>
+                                Draft
+                            </option>
+
+                        </select>
+
+                    </div>
+
+                    <!-- Name -->
+                    <div>
+
+                        <label class="mb-2 block text-sm font-medium text-zinc-300">
+                            Coffee Name
+                        </label>
+
+                        <input
+                            type="text"
+                            name="name"
+                            placeholder="Coffee name"
+                            required
+                            class="w-full rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-white placeholder:text-zinc-500 outline-none transition focus:border-emerald-500"
+                        >
+
+                    </div>
+
+                    <!-- Location -->
+                    <div>
+
+                        <label class="mb-2 block text-sm font-medium text-zinc-300">
+                            Location
+                        </label>
+
+                        <input
+                            type="text"
+                            name="location"
+                            placeholder="Location"
+                            required
+                            class="w-full rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-white placeholder:text-zinc-500 outline-none transition focus:border-emerald-500"
+                        >
+
+                    </div>
+
+                    <!-- City -->
+                    <div>
+
+                        <label class="mb-2 block text-sm font-medium text-zinc-300">
+                            City
+                        </label>
+
+                        <input
+                            type="text"
+                            name="city"
+                            placeholder="City"
+                            required
+                            class="w-full rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-white placeholder:text-zinc-500 outline-none transition focus:border-emerald-500"
+                        >
+
+                    </div>
+
+                    <!-- Cover Image -->
+                    <div>
+
+                        <label class="mb-2 block text-sm font-medium text-zinc-300">
+                            Cover Image URL
+                        </label>
+
+                        <input
+                            type="text"
+                            name="cover_image"
+                            placeholder="https://..."
+                            required
+                            class="w-full rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-white placeholder:text-zinc-500 outline-none transition focus:border-emerald-500"
+                        >
+
+                    </div>
+
+                    <!-- Excerpt -->
+                    <div>
+
+                        <label class="mb-2 block text-sm font-medium text-zinc-300">
+                            Excerpt
+                        </label>
+
+                        <textarea
+                            name="excerpt"
+                            rows="4"
+                            class="w-full rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-white placeholder:text-zinc-500 outline-none transition focus:border-emerald-500"
+                            placeholder="Short excerpt..."
+                        ></textarea>
+
+                    </div>
+
+                    <!-- Description -->
+                    <div>
+
+                        <label class="mb-2 block text-sm font-medium text-zinc-300">
+                            Description
+                        </label>
+
+                        <textarea
+                            name="description"
+                            rows="6"
+                            class="w-full rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-white placeholder:text-zinc-500 outline-none transition focus:border-emerald-500"
+                            placeholder="Detailed description..."
+                        ></textarea>
+
+                    </div>
+
+                    <!-- Conclusion -->
+                    <div>
+
+                        <label class="mb-2 block text-sm font-medium text-zinc-300">
+                            Conclusion
+                        </label>
+
+                        <textarea
+                            name="conclusion"
+                            rows="4"
+                            class="w-full rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-white placeholder:text-zinc-500 outline-none transition focus:border-emerald-500"
+                            placeholder="Final thoughts..."
+                        ></textarea>
+
+                    </div>
+
+                    <!-- Instagram -->
+                    <div>
+
+                        <label class="mb-2 block text-sm font-medium text-zinc-300">
+                            Instagram
+                        </label>
+
+                        <input
+                            type="text"
+                            name="instagram"
+                            placeholder="@instagram"
+                            class="w-full rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-white placeholder:text-zinc-500 outline-none transition focus:border-emerald-500"
+                        >
+
+                    </div>
+
+                    <!-- Website -->
+                    <div>
+
+                        <label class="mb-2 block text-sm font-medium text-zinc-300">
+                            Website
+                        </label>
+
+                        <input
+                            type="text"
+                            name="website"
+                            placeholder="https://website.com"
+                            class="w-full rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-white placeholder:text-zinc-500 outline-none transition focus:border-emerald-500"
+                        >
+
+                    </div>
+
+                    <!-- Meta Title -->
+                    <div>
+
+                        <label class="mb-2 block text-sm font-medium text-zinc-300">
+                            Meta Title
+                        </label>
+
+                        <input
+                            type="text"
+                            name="meta_title"
+                            placeholder="Meta title"
+                            class="w-full rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-white placeholder:text-zinc-500 outline-none transition focus:border-emerald-500"
+                        >
+
+                    </div>
+
+                    <!-- Meta Description -->
+                    <div>
+
+                        <label class="mb-2 block text-sm font-medium text-zinc-300">
+                            Meta Description
+                        </label>
+
+                        <input
+                            type="text"
+                            name="meta_desc"
+                            placeholder="Meta description"
+                            class="w-full rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-white placeholder:text-zinc-500 outline-none transition focus:border-emerald-500"
+                        >
+
+                    </div>
+
+                    <!-- Meta Keywords -->
+                    <div>
+
+                        <label class="mb-2 block text-sm font-medium text-zinc-300">
+                            Meta Keywords
+                        </label>
+
+                        <input
+                            type="text"
+                            name="meta_keywords"
+                            placeholder="coffee, cafe, espresso"
+                            class="w-full rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-white placeholder:text-zinc-500 outline-none transition focus:border-emerald-500"
+                        >
+
+                    </div>
+
+                    <!-- Submit -->
+                    <div class="pt-4">
+
+                        <button
+                            type="submit"
+                            class="w-full rounded-xl bg-emerald-500 px-6 py-4 text-sm font-semibold text-black transition hover:bg-emerald-400"
+                        >
+                            Create Coffee
+                        </button>
+
+                    </div>
+
+                </form>
+
+            </div>
+
+        </div>
+
+    </div>
 
     HTML;
 
@@ -373,39 +916,397 @@ function createSlug($name)
     // remove extra -
     $slug = trim($slug, "-");
 
-    $coffee = readCoffee();
-
-    $existingSlugs = array_column($coffee, "coffee_slug");
-
     $originalSlug = $slug;
 
-    // check uniqueness
-    while (in_array($slug, $existingSlugs)) {
-        $random = rand(100, 999);
-        $slug = $originalSlug . "-" . $random;
+    // keep generating until unique
+    while (slugExists($slug)) {
+        $slug = $originalSlug . "-" . rand(100, 999);
     }
 
     return $slug;
 }
 
+function slugExists($slug)
+{
+    $coffee = readCoffee();
+
+    return isset($coffee[$slug]);
+}
+
+//EDIT route for admin
 function edit()
 {
     authGuard();
 
-    $id = $_SESSION["edit"];
+    global $pdo;
+    global $admin;
 
-    echo $id;
+    $id = $_SESSION["editId"];
+
+    // Fetch existing coffee
+    $stmt = $pdo->prepare("SELECT * FROM drink_coffee WHERE id = :id");
+    $stmt->execute([":id" => $id]);
+
+    $coffee = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    if (!$coffee) {
+        die("Coffee not found");
+    }
+
+    // Handle update submit
+    if ($_SERVER["REQUEST_METHOD"] == "POST") {
+        $name = $_POST["name"];
+        $location = $_POST["location"];
+        $city = $_POST["city"];
+        $cover_image = $_POST["cover_image"];
+        $excerpt = $_POST["excerpt"];
+        $description = $_POST["description"];
+        $conclusion = $_POST["conclusion"];
+        $instagram = $_POST["instagram"];
+        $website = $_POST["website"];
+        $meta_title = $_POST["meta_title"];
+        $meta_description = $_POST["meta_desc"];
+        $meta_keywords = $_POST["meta_keywords"];
+
+        $published = $_POST["published"] === "true" ? 1 : 0;
+
+        $old_slug = $coffee["slug"];
+
+        // only generate slug if name changed
+        if ($coffee["name"] !== $name) {
+            $new_slug = createSlug($name);
+
+            updateCoffee($old_slug, $new_slug, $id);
+        } else {
+            $new_slug = $old_slug;
+        }
+
+        $sql = "
+            UPDATE drink_coffee
+            SET
+                name = :name,
+                slug = :slug,
+                location = :location,
+                city = :city,
+                cover_image = :cover_image,
+                excerpt = :excerpt,
+                description = :description,
+                conclusion = :conclusion,
+                instagram = :instagram,
+                website = :website,
+                meta_title = :meta_title,
+                meta_description = :meta_description,
+                meta_keywords = :meta_keywords,
+                published = :published
+            WHERE id = :id
+        ";
+
+        try {
+            $stmt = $pdo->prepare($sql);
+
+            $stmt->execute([
+                ":name" => $name,
+                ":slug" => $new_slug,
+                ":location" => $location,
+                ":city" => $city,
+                ":cover_image" => $cover_image,
+                ":excerpt" => $excerpt,
+                ":description" => $description,
+                ":conclusion" => $conclusion,
+                ":instagram" => $instagram,
+                ":website" => $website,
+                ":meta_title" => $meta_title,
+                ":meta_description" => $meta_description,
+                ":meta_keywords" => $meta_keywords,
+                ":published" => $published,
+                ":id" => $id,
+            ]);
+
+            header("Location: $admin");
+            exit();
+        } catch (PDOException $e) {
+            echo "Database Error: " . $e->getMessage();
+        }
+    }
+
+    // Selected option
+    $publishSelected = $coffee["published"] ? "selected" : "";
+    $draftSelected = !$coffee["published"] ? "selected" : "";
+
     $head = <<<HTML
-        <title>edit </title>
+        <title>Edit {$coffee["name"]}</title>
     HTML;
 
     $body = <<<HTML
-        <p> edit </p>
+
+    <div class="min-h-screen bg-zinc-950 px-6 py-10 text-white">
+
+        <div class="mx-auto max-w-4xl">
+
+            <!-- Header -->
+            <div class="mb-8">
+
+                <h1 class="text-4xl font-bold tracking-tight text-white">
+                    Edit Coffee
+                </h1>
+
+                <p class="mt-2 text-zinc-400">
+                    Update your coffee shop information
+                </p>
+
+            </div>
+
+            <!-- Form Card -->
+            <div class="rounded-2xl border border-zinc-800 bg-zinc-900 p-8 shadow-2xl">
+
+                <form method="POST" class="space-y-6">
+
+                    <!-- Publish -->
+                    <div>
+
+                        <label
+                            for="publish"
+                            class="mb-2 block text-sm font-medium text-zinc-300"
+                        >
+                            Publish Status
+                        </label>
+
+                        <select
+                            name="published"
+                            id="publish"
+                            class="w-full rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-white outline-none transition focus:border-emerald-500"
+                        >
+                            <option value="true" $publishSelected>
+                                Publish
+                            </option>
+
+                            <option value="false" $draftSelected>
+                                Draft
+                            </option>
+
+                        </select>
+
+                    </div>
+
+                    <!-- Name -->
+                    <div>
+
+                        <label class="mb-2 block text-sm font-medium text-zinc-300">
+                            Coffee Name
+                        </label>
+
+                        <input
+                            type="text"
+                            name="name"
+                            value="{$coffee["name"]}"
+                            required
+                            class="w-full rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-white placeholder:text-zinc-500 outline-none transition focus:border-emerald-500"
+                        >
+
+                    </div>
+
+                    <!-- Location -->
+                    <div>
+
+                        <label class="mb-2 block text-sm font-medium text-zinc-300">
+                            Location
+                        </label>
+
+                        <input
+                            type="text"
+                            name="location"
+                            value="{$coffee["location"]}"
+                            required
+                            class="w-full rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-white outline-none transition focus:border-emerald-500"
+                        >
+
+                    </div>
+
+                    <!-- City -->
+                    <div>
+
+                        <label class="mb-2 block text-sm font-medium text-zinc-300">
+                            City
+                        </label>
+
+                        <input
+                            type="text"
+                            name="city"
+                            value="{$coffee["city"]}"
+                            required
+                            class="w-full rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-white outline-none transition focus:border-emerald-500"
+                        >
+
+                    </div>
+
+                    <!-- Cover Image -->
+                    <div>
+
+                        <label class="mb-2 block text-sm font-medium text-zinc-300">
+                            Cover Image URL
+                        </label>
+
+                        <input
+                            type="text"
+                            name="cover_image"
+                            value="{$coffee["cover_image"]}"
+                            required
+                            class="w-full rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-white outline-none transition focus:border-emerald-500"
+                        >
+
+                    </div>
+
+                    <!-- Excerpt -->
+                    <div>
+
+                        <label class="mb-2 block text-sm font-medium text-zinc-300">
+                            Excerpt
+                        </label>
+
+                        <textarea
+                            name="excerpt"
+                            rows="4"
+                            class="w-full rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-white outline-none transition focus:border-emerald-500"
+                        >{$coffee["excerpt"]}</textarea>
+
+                    </div>
+
+                    <!-- Description -->
+                    <div>
+
+                        <label class="mb-2 block text-sm font-medium text-zinc-300">
+                            Description
+                        </label>
+
+                        <textarea
+                            name="description"
+                            rows="6"
+                            class="w-full rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-white outline-none transition focus:border-emerald-500"
+                        >{$coffee["description"]}</textarea>
+
+                    </div>
+
+                    <!-- Conclusion -->
+                    <div>
+
+                        <label class="mb-2 block text-sm font-medium text-zinc-300">
+                            Conclusion
+                        </label>
+
+                        <textarea
+                            name="conclusion"
+                            rows="4"
+                            class="w-full rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-white outline-none transition focus:border-emerald-500"
+                        >{$coffee["conclusion"]}</textarea>
+
+                    </div>
+
+                    <!-- Instagram -->
+                    <div>
+
+                        <label class="mb-2 block text-sm font-medium text-zinc-300">
+                            Instagram
+                        </label>
+
+                        <input
+                            type="text"
+                            name="instagram"
+                            value="{$coffee["instagram"]}"
+                            class="w-full rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-white outline-none transition focus:border-emerald-500"
+                        >
+
+                    </div>
+
+                    <!-- Website -->
+                    <div>
+
+                        <label class="mb-2 block text-sm font-medium text-zinc-300">
+                            Website
+                        </label>
+
+                        <input
+                            type="text"
+                            name="website"
+                            value="{$coffee["website"]}"
+                            class="w-full rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-white outline-none transition focus:border-emerald-500"
+                        >
+
+                    </div>
+
+                    <!-- Meta Title -->
+                    <div>
+
+                        <label class="mb-2 block text-sm font-medium text-zinc-300">
+                            Meta Title
+                        </label>
+
+                        <input
+                            type="text"
+                            name="meta_title"
+                            value="{$coffee["meta_title"]}"
+                            class="w-full rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-white outline-none transition focus:border-emerald-500"
+                        >
+
+                    </div>
+
+                    <!-- Meta Description -->
+                    <div>
+
+                        <label class="mb-2 block text-sm font-medium text-zinc-300">
+                            Meta Description
+                        </label>
+
+                        <input
+                            type="text"
+                            name="meta_desc"
+                            value="{$coffee["meta_description"]}"
+                            class="w-full rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-white outline-none transition focus:border-emerald-500"
+                        >
+
+                    </div>
+
+                    <!-- Meta Keywords -->
+                    <div>
+
+                        <label class="mb-2 block text-sm font-medium text-zinc-300">
+                            Meta Keywords
+                        </label>
+
+                        <input
+                            type="text"
+                            name="meta_keywords"
+                            value="{$coffee["meta_keywords"]}"
+                            class="w-full rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-white outline-none transition focus:border-emerald-500"
+                        >
+
+                    </div>
+
+                    <!-- Submit -->
+                    <div class="pt-4">
+
+                        <button
+                            type="submit"
+                            class="w-full rounded-xl bg-blue-600 px-6 py-4 text-sm font-semibold text-white transition hover:bg-blue-500"
+                        >
+                            Update Coffee
+                        </button>
+
+                    </div>
+
+                </form>
+
+            </div>
+
+        </div>
+
+    </div>
+
     HTML;
 
     return [$head, $body];
 }
 
+//404
 function fourZeroFour()
 {
     $head = "";
@@ -415,6 +1316,7 @@ function fourZeroFour()
     return [$head, $body];
 }
 
+//500
 function fiveHundred()
 {
     $head = <<<HTML
@@ -434,7 +1336,6 @@ function readCoffee()
     if (!file_exists("coffee.json")) {
         file_put_contents("coffee.json", json_encode([]));
     }
-
     $data = file_get_contents("coffee.json");
     return json_decode($data, true) ?? [];
 }
@@ -442,48 +1343,31 @@ function readCoffee()
 function addCoffee($id, $coffee_slug)
 {
     $coffee = readCoffee();
-
-    $coffee[] = [
-        "id" => $id,
-        "coffee_slug" => $coffee_slug,
-    ];
-
+    $coffee[$coffee_slug] = $id; // slug as key, id as value
     file_put_contents("coffee.json", json_encode($coffee, JSON_PRETTY_PRINT));
 }
-function updateCoffee($id, $coffee_slug)
+
+function updateCoffee($old_slug, $new_slug, $id)
 {
     $coffee = readCoffee();
-    $coffee_found = false;
-    foreach ($coffee as $items) {
-        if ($items["id"] == $id) {
-            $items["coffee_slug"] == $coffee_slug;
-            $coffee_found = true;
-            break;
-        }
+    if (!isset($coffee[$old_slug])) {
+        return false; // not found
     }
-    if ($coffee_found) {
-        file_put_contents(
-            "coffee.json",
-            json_decode($coffee, JSON_PRETTY_PRINT),
-        );
-    }
-    return $coffee_found;
+    unset($coffee[$old_slug]); // remove old slug
+    $coffee[$new_slug] = $id; // add new slug
+    file_put_contents("coffee.json", json_encode($coffee, JSON_PRETTY_PRINT));
+    return true;
 }
 
-function deleteCoffee($id)
+function deleteCoffee($slug)
 {
     $coffee = readCoffee();
-    foreach ($coffee as $key => $item) {
-        if ($item["id"] == $id) {
-            unset($coffee[$key]); // Remove the item
-            file_put_contents(
-                "coffee.json",
-                json_encode(array_values($coffee), JSON_PRETTY_PRINT),
-            );
-            return true; // Successfully deleted
-        }
+    if (!isset($coffee[$slug])) {
+        return false;
     }
-    return false; // ID not found
+    unset($coffee[$slug]);
+    file_put_contents("coffee.json", json_encode($coffee, JSON_PRETTY_PRINT));
+    return true;
 }
 ?>
 
@@ -504,7 +1388,6 @@ function deleteCoffee($id)
         </style>
     </head>
     <body >
-        <h1 class="text-3xl">COFFEEMANDU </h1>
         <?php echo $body_on_route; ?>
     </body>
 </html>

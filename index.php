@@ -58,7 +58,8 @@ $uri = $_SERVER["REQUEST_URI"];
 switch ($uri) {
     case "":
     case "/":
-        [$head_on_route, $body_on_route] = home();
+        $page = 1;
+        [$head_on_route, $body_on_route] = home($page);
         break;
 
     case $admin:
@@ -86,8 +87,17 @@ switch ($uri) {
 //Middleware
 function coffee($slug)
 {
-    $coffeeSlug = "test";
     $which_city = "kathmandu";
+
+    if (is_numeric($slug)) {
+        $page = (int) $slug;
+
+        if ($page < 1) {
+            return fourZeroFour();
+        }
+
+        return home($page);
+    }
 
     // city route
     if ($slug === $which_city) {
@@ -95,7 +105,7 @@ function coffee($slug)
     }
 
     // coffee route
-    if ($slug === $coffeeSlug) {
+    if (slugExists($slug)) {
         return slugBased($slug);
     }
 
@@ -118,18 +128,88 @@ function authGuard()
 //FUNCTIONS RENDERING HTML AND SERVER SIDE LOGIC
 //
 
-function home()
+function home($page = 1)
 {
-    $head = <<<HTML
-    <title>Coffeemandu - your goto coffee shop directory</title>
+    global $pdo;
 
-    HTML;
+    $perPage = 7;
 
-    $body = <<<HTML
-    <h1> this is body of main page </h1>
-    HTML;
+    if ($page < 1) {
+        $page = 1;
+    }
 
-    return [$head, $body];
+    $offset = ($page - 1) * $perPage;
+
+    try {
+        $countStmt = $pdo->query("SELECT COUNT(*) FROM drink_coffee");
+        $totalRows = $countStmt->fetchColumn();
+
+        $totalPages = (int) ceil($totalRows / $perPage);
+
+        // prevent overflow page
+        if ($totalPages > 0 && $page > $totalPages) {
+            return fourZeroFour();
+        }
+
+        $stmt = $pdo->prepare("
+            SELECT id, name, location, city, cover_image, slug, excerpt
+            FROM drink_coffee
+            ORDER BY id DESC
+            LIMIT :limit OFFSET :offset
+        ");
+
+        $stmt->bindValue(":limit", $perPage, PDO::PARAM_INT);
+        $stmt->bindValue(":offset", $offset, PDO::PARAM_INT);
+
+        $stmt->execute();
+
+        $coffees = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    } catch (Exception $e) {
+        return fourZeroFour();
+    }
+
+    $coffeeHtml = "";
+
+    foreach ($coffees as $coffee) {
+        $name = htmlspecialchars($coffee["name"]);
+        $city = htmlspecialchars($coffee["city"]);
+        $excerpt = htmlspecialchars($coffee["excerpt"]);
+
+        $coffeeHtml .= "
+        <div class='coffee-card'>
+            <h2>{$name}</h2>
+            <p>{$city}</p>
+            <p>{$excerpt}</p>
+        </div>";
+    }
+
+    $pagination = "<div class='pagination'>";
+
+    // Previous
+    if ($page > 1) {
+        $pagination .= "<a href='/" . ($page - 1) . "'>Previous</a> ";
+    }
+
+    // Page numbers
+    for ($i = 1; $i <= $totalPages; $i++) {
+        if ($i == $page) {
+            $pagination .= "<strong>{$i}</strong> ";
+        } else {
+            $pagination .= "<a href='/{$i}'>{$i}</a> ";
+        }
+    }
+
+    // Next
+    if ($page < $totalPages) {
+        $pagination .= "<a href='/" . ($page + 1) . "'>Next</a>";
+    }
+
+    $pagination .= "</div>";
+
+    return [
+        "<title>Coffeemandu</title>",
+        "<h1>Home</h1>{$coffeeHtml}{$pagination}",
+    ];
 }
 
 function cityBased($slug)

@@ -7,7 +7,8 @@ $admin = "/admin";
 $admin_login_route = "/adminlogin";
 $create_admin_route = "/admin/create";
 $edit_admin_route = "/admin/edit";
-
+$admin_user = "admin";
+$admin_pass = "secret123";
 //DATABASE
 
 //database credientials
@@ -115,16 +116,18 @@ function coffee($slug)
 
 function authGuard()
 {
+    global $admin_user;
     if (
         !isset($_SESSION["admin_logged_in"], $_SESSION["admin_username"]) ||
         ($_SESSION["admin_logged_in"] == !true &&
-            $_SESSION["admin_username"] != "SurajKumal")
+            $_SESSION["admin_username"] != $admin_user)
     ) {
         header("Location: /adminlogin");
         exit();
     }
     return true;
 }
+
 //FUNCTIONS RENDERING HTML AND SERVER SIDE LOGIC
 //
 
@@ -133,24 +136,22 @@ function home($page = 1)
     global $pdo;
 
     $perPage = 7;
-
-    if ($page < 1) {
-        $page = 1;
-    }
-
+    $page = max(1, (int) $page);
     $offset = ($page - 1) * $perPage;
 
     try {
+        // Total rows
         $countStmt = $pdo->query("SELECT COUNT(*) FROM drink_coffee");
-        $totalRows = $countStmt->fetchColumn();
+        $totalRows = (int) $countStmt->fetchColumn();
 
         $totalPages = (int) ceil($totalRows / $perPage);
 
-        // prevent overflow page
+        // Invalid page
         if ($totalPages > 0 && $page > $totalPages) {
             return fourZeroFour();
         }
 
+        // Fetch coffees
         $stmt = $pdo->prepare("
             SELECT id, name, location, city, cover_image, slug, excerpt
             FROM drink_coffee
@@ -168,48 +169,85 @@ function home($page = 1)
         return fourZeroFour();
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    |Coffee Cards
+    |--------------------------------------------------------------------------
+    */
+
     $coffeeHtml = "";
 
     foreach ($coffees as $coffee) {
         $name = htmlspecialchars($coffee["name"]);
         $city = htmlspecialchars($coffee["city"]);
         $excerpt = htmlspecialchars($coffee["excerpt"]);
+        $cover_image = htmlspecialchars($coffee["cover_image"]);
+        $slug = htmlspecialchars($coffee["slug"]);
 
         $coffeeHtml .= "
-        <div class='coffee-card'>
-            <h2>{$name}</h2>
-            <p>{$city}</p>
-            <p>{$excerpt}</p>
-        </div>";
+            <a href='/{$slug}'>
+            <div class='coffee-card'>
+                <img src={$cover_image} alt='{$name}' loading='lazy' width='400' height='218'>
+                <h2>{$name}</h2>
+                <p>{$city}</p>
+                <p>{$excerpt}</p>
+            </div>
+            </a>
+        ";
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Pagination
+    |--------------------------------------------------------------------------
+    */
 
     $pagination = "<div class='pagination'>";
 
-    // Previous
+    // Previous button
     if ($page > 1) {
-        $pagination .= "<a href='/" . ($page - 1) . "'>Previous</a> ";
+        $prevPage = $page - 1;
+        $pagination .= "<a href='/{$prevPage}'>Previous</a> ";
     }
 
     // Page numbers
     for ($i = 1; $i <= $totalPages; $i++) {
-        if ($i == $page) {
+        if ($i === $page) {
             $pagination .= "<strong>{$i}</strong> ";
         } else {
             $pagination .= "<a href='/{$i}'>{$i}</a> ";
         }
     }
 
-    // Next
+    // Next button
     if ($page < $totalPages) {
-        $pagination .= "<a href='/" . ($page + 1) . "'>Next</a>";
+        $nextPage = $page + 1;
+        $pagination .= "<a href='/{$nextPage}'>Next</a>";
     }
 
     $pagination .= "</div>";
 
-    return [
-        "<title>Coffeemandu</title>",
-        "<h1>Home</h1>{$coffeeHtml}{$pagination}",
-    ];
+    /*
+    |--------------------------------------------------------------------------
+    | Head & Body
+    |--------------------------------------------------------------------------
+    */
+
+    $head = "
+        <title>Coffeemandu</title>
+    ";
+
+    $body = "
+        <h1>Home</h1>
+
+        <div class='coffee-list'>
+            {$coffeeHtml}
+        </div>
+
+        {$pagination}
+    ";
+
+    return [$head, $body];
 }
 
 function cityBased($slug)
@@ -229,16 +267,64 @@ function cityBased($slug)
 
 function slugBased($slug)
 {
+    global $pdo;
     //slug logic
-
-    $slug_to_db = $slug;
+    try {
+        $stmt = $pdo->prepare(
+            "SELECT name, location, city, cover_image, description, conclusion, instagram, website, meta_title, meta_description, meta_keywords, updated_at FROM drink_coffee WHERE slug = :slug",
+        );
+        $stmt->execute([":slug" => $slug]);
+        $coffee_data = $stmt->fetch(PDO::FETCH_ASSOC);
+    } catch (Exception $e) {
+        return fiveHundred();
+    }
+    if ($coffee_data) {
+        $name = $coffee_data["name"];
+        $location = $coffee_data["location"];
+        $city = $coffee_data["city"];
+        $cover_image = $coffee_data["cover_image"];
+        $description = $coffee_data["description"];
+        $conclusion = $coffee_data["conclusion"];
+        $updatedTime = $coffee_data["updated_at"];
+    }
     $head = <<<HTML
     <title>slug test</title>
 
     HTML;
 
     $body = <<<HTML
-    <h1> slug </h1>
+        <h1>{$name} </h1>
+        <img src="{$cover_image}" width="600" height="318">
+        <p>$location</p>
+        <p>$city</p>
+        <p>$updatedTime</p>
+        <p>$description</p>
+        <p>$conclusion</p>
+
+    HTML;
+
+    return [$head, $body];
+}
+
+//404
+function fourZeroFour()
+{
+    $head = "";
+    $body = <<<HTML
+        <h1>404 not found <h1>
+    HTML;
+    return [$head, $body];
+}
+
+//500
+function fiveHundred()
+{
+    $head = <<<HTML
+        <title>Internal Server Error </title>
+    HTML;
+
+    $body = <<<HTML
+        <h1>Internal Server Error </title>
     HTML;
 
     return [$head, $body];
@@ -506,14 +592,14 @@ function admin()
 
 function adminLogin()
 {
-    $adminLogin = "admin";
-    $adminPassword = "secret123";
+    global $admin_user;
+    global $admin_pass;
 
     if ($_SERVER["REQUEST_METHOD"] == "POST") {
         $user = $_POST["username"];
         $pass = $_POST["password"];
 
-        if ($user == $adminLogin && $pass == $adminPassword) {
+        if ($user == $admin_user && $pass == $admin_pass) {
             $_SESSION["admin_logged_in"] = true;
             $_SESSION["admin_username"] = "SurajKumal";
             header("Location: /admin");
@@ -712,6 +798,7 @@ function create()
 
     $head = <<<HTML
         <title>create </title>
+        <script src="https://cdn.jsdelivr.net/npm/tinymce@7/tinymce.min.js"></script>
     HTML;
 
     $body = <<<HTML
@@ -857,11 +944,28 @@ function create()
                         </label>
 
                         <textarea
+                            id="description"
                             name="description"
                             rows="6"
                             class="w-full rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-white placeholder:text-zinc-500 outline-none transition focus:border-emerald-500"
                             placeholder="Detailed description..."
                         ></textarea>
+                        <script>
+                        tinymce.init({
+                          selector: '#description',
+                          plugins: 'lists link image',
+                          toolbar: 'formatselect | bold italic | bullist numlist | link image',
+                          block_formats: 'Paragraph=p; Heading 2=h2; Heading 3=h3; Heading 4=h4; Heading 5=h5; Heading 6=h6',
+                          forced_root_block: 'p',
+                          image_uploadtab: false,
+                          automatic_uploads: false,
+                          valid_styles: {},
+                        });
+
+                        document.querySelector("form").addEventListener("submit", function () {
+                          tinymce.triggerSave();
+                        });
+                        </script>
 
                     </div>
 
@@ -1115,6 +1219,8 @@ function edit()
 
     $head = <<<HTML
         <title>Edit {$coffee["name"]}</title>
+     <script src="https://cdn.jsdelivr.net/npm/tinymce@7/tinymce.min.js"></script>
+
     HTML;
 
     $body = <<<HTML
@@ -1259,10 +1365,29 @@ function edit()
                         </label>
 
                         <textarea
+                            id="description"
                             name="description"
                             rows="6"
                             class="w-full rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-white outline-none transition focus:border-emerald-500"
                         >{$coffee["description"]}</textarea>
+
+
+                        <script>
+                        tinymce.init({
+                          selector: '#description',
+                          plugins: 'lists link image',
+                          toolbar: 'formatselect | bold italic | bullist numlist | link image',
+                          block_formats: 'Paragraph=p; Heading 2=h2; Heading 3=h3; Heading 4=h4; Heading 5=h5; Heading 6=h6',
+                          forced_root_block: 'p',
+                          image_uploadtab: false,
+                          automatic_uploads: false,
+                          valid_styles: {},
+                        });
+
+                        document.querySelector("form").addEventListener("submit", function () {
+                          tinymce.triggerSave();
+                        });
+                        </script>
 
                     </div>
 
@@ -1386,30 +1511,6 @@ function edit()
     return [$head, $body];
 }
 
-//404
-function fourZeroFour()
-{
-    $head = "";
-    $body = <<<HTML
-        <h1>404 not found <h1>
-    HTML;
-    return [$head, $body];
-}
-
-//500
-function fiveHundred()
-{
-    $head = <<<HTML
-        <title>Internal Server Error </title>
-    HTML;
-
-    $body = <<<HTML
-        <h1>Internal Server Error </title>
-    HTML;
-
-    return [$head, $body];
-}
-
 //JSON caching
 function readCoffee()
 {
@@ -1455,9 +1556,11 @@ function deleteCoffee($slug)
 
 
 <!-- RENDER LAYOUT -->
-
-<html>
+<!DOCTYPE html>
+<html lang="en">
     <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
         <link href="https://fonts.cdnfonts.com/css/akzidenzgrotesk" rel="stylesheet">
         <?php echo $head_on_route; ?>
@@ -1468,6 +1571,7 @@ function deleteCoffee($slug)
         </style>
     </head>
     <body >
+        <!--<h1>HIDDEN BEANS</h1>-->
         <?php echo $body_on_route; ?>
     </body>
 </html>

@@ -1,5 +1,9 @@
 <?php
 
+//define
+//
+//define(key1, "value");
+
 //GLOBAL VAR
 $head_on_route = "";
 $body_on_route = "";
@@ -83,7 +87,7 @@ switch ($uri) {
         $slug = trim($uri, "/");
         [$head_on_route, $body_on_route] = coffee($slug);
 }
-//todo change to switch in future
+//todo change to match in future
 
 //Middleware
 function coffee($slug)
@@ -764,8 +768,9 @@ function create()
                    )
                ";
         try {
-            $stmt = $pdo->prepare($sql);
+            $pdo->beginTransaction();
 
+            $stmt = $pdo->prepare($sql);
             $stmt->execute([
                 ":name" => $name,
                 ":slug" => $slug,
@@ -785,14 +790,54 @@ function create()
 
             $newId = $pdo->lastInsertId();
 
+            $stmt = $pdo->prepare(
+                "SELECT created_at, updated_at FROM drink_coffee WHERE id = :id",
+            );
+            $stmt->execute([":id" => $newId]);
+            $times = $stmt->fetch(PDO::FETCH_ASSOC);
+
+            //first
+            AddCoffeeShop(
+                $slug,
+                $newId,
+                $name,
+                $location,
+                $city,
+                $cover_image,
+                $excerpt,
+                $description,
+                $conclusion,
+                $instagram,
+                $website,
+                $meta_title,
+                $meta_description,
+                $meta_keywords,
+                $published,
+                $times["created_at"],
+                $times["updated_at"],
+            );
+
+            //second
             addCoffee($newId, $slug);
 
-            header("Location: $admin");
+            $pdo->commit();
 
-            echo "$name added sucessfully";
+            header("Location: $admin");
             exit();
-        } catch (PDOException $e) {
-            echo "Database Error: " . $e->getMessage();
+        } catch (Exception $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+
+            // Unlink ghost {id}.json if it was written
+            if (isset($newId)) {
+                $ghostFile = __DIR__ . "/hotcoffee/{$newId}.json";
+                if (file_exists($ghostFile)) {
+                    unlink($ghostFile);
+                }
+            }
+
+            echo "Error: " . $e->getMessage();
         }
     }
 
@@ -1375,6 +1420,7 @@ function edit()
                         <script>
                         tinymce.init({
                           selector: '#description',
+                          license_key: 'gpl',
                           plugins: 'lists link image',
                           toolbar: 'formatselect | bold italic | bullist numlist | link image',
                           block_formats: 'Paragraph=p; Heading 2=h2; Heading 3=h3; Heading 4=h4; Heading 5=h5; Heading 6=h6',
@@ -1511,7 +1557,7 @@ function edit()
     return [$head, $body];
 }
 
-//JSON caching
+//JSON slugs
 function readCoffee()
 {
     if (!file_exists("coffee.json")) {
@@ -1525,14 +1571,17 @@ function addCoffee($id, $coffee_slug)
 {
     $coffee = readCoffee();
     $coffee[$coffee_slug] = $id; // slug as key, id as value
-    file_put_contents("coffee.json", json_encode($coffee, JSON_PRETTY_PRINT));
+    $data = json_encode($coffee, JSON_THROW_ON_ERROR);
+    if (file_put_contents("coffee.json", $data) === false) {
+        throw new RuntimeException("Failed to update coffee.json");
+    }
 }
 
 function updateCoffee($old_slug, $new_slug, $id)
 {
     $coffee = readCoffee();
     if (!isset($coffee[$old_slug])) {
-        return false; // not found
+        return false;
     }
     unset($coffee[$old_slug]); // remove old slug
     $coffee[$new_slug] = $id; // add new slug
@@ -1550,6 +1599,79 @@ function deleteCoffee($slug)
     file_put_contents("coffee.json", json_encode($coffee, JSON_PRETTY_PRINT));
     return true;
 }
+
+//json for shop data
+function AddCoffeeShop(
+    $slug,
+    $id,
+    $name,
+    $location,
+    $city,
+    $cover_image,
+    $excerpt,
+    $description,
+    $conclusion,
+    $instagram,
+    $website,
+    $meta_title,
+    $meta_description,
+    $meta_keywords,
+    $published,
+    $created_at,
+    $updated_at,
+) {
+    $directory = __DIR__ . "/hotcoffee";
+
+    if (!is_dir($directory)) {
+        mkdir($directory, 0755, true);
+    }
+
+    $shopPath = "$directory/$id.json";
+
+    $data = [
+        "slug" => $slug,
+        "id" => $id,
+        "name" => $name,
+        "location" => $location,
+        "city" => $city,
+        "cover_image" => $cover_image,
+        "excerpt" => $excerpt,
+        "description" => $description,
+        "conclusion" => $conclusion,
+        "instagram" => $instagram,
+        "website" => $website,
+        "meta_title" => $meta_title,
+        "meta_description" => $meta_description,
+        "meta_keywords" => $meta_keywords,
+        "published" => $published,
+        "created_at" => $created_at,
+        "updated_at" => $updated_at,
+    ];
+
+    if (!file_exists($shopPath)) {
+        $json = json_encode($data, JSON_UNESCAPED_SLASHES);
+
+        if ($json === false) {
+            throw new RuntimeException(
+                "JSON encoding failed: " . json_last_error_msg(),
+            );
+        }
+
+        if (file_put_contents($shopPath, $json) === false) {
+            throw new RuntimeException("Failed to write file: {$shopPath}");
+        }
+
+        return true;
+    } else {
+        throw new RuntimeException("file already exists");
+    }
+}
+
+function UpdateCoffeeShop() {}
+
+function GetCoffeeShop($slug) {}
+
+function DeleteCoffeeShop() {}
 ?>
 
 

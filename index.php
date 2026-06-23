@@ -109,8 +109,10 @@ function coffee($slug)
         return cityBased($slug);
     }
 
+    $coffee = readCoffee();
+
     // coffee route
-    if (slugExists($slug)) {
+    if (slugExists($slug) && (int) $coffee[$slug][1] === 1) {
         return slugBased($slug);
     }
 
@@ -794,31 +796,8 @@ function create()
                 "SELECT created_at, updated_at FROM drink_coffee WHERE id = :id",
             );
             $stmt->execute([":id" => $newId]);
-            $times = $stmt->fetch(PDO::FETCH_ASSOC);
 
-            //first
-            AddCoffeeShop(
-                $slug,
-                $newId,
-                $name,
-                $location,
-                $city,
-                $cover_image,
-                $excerpt,
-                $description,
-                $conclusion,
-                $instagram,
-                $website,
-                $meta_title,
-                $meta_description,
-                $meta_keywords,
-                $published,
-                $times["created_at"],
-                $times["updated_at"],
-            );
-
-            //second
-            addCoffee($newId, $slug);
+            addCoffee($newId, $slug, $published);
 
             $pdo->commit();
 
@@ -828,15 +807,6 @@ function create()
             if ($pdo->inTransaction()) {
                 $pdo->rollBack();
             }
-
-            // Unlink ghost {id}.json if it was written
-            if (isset($newId)) {
-                $ghostFile = __DIR__ . "/hotcoffee/{$newId}.json";
-                if (file_exists($ghostFile)) {
-                    unlink($ghostFile);
-                }
-            }
-
             echo "Error: " . $e->getMessage();
         }
     }
@@ -1184,53 +1154,52 @@ function edit()
 
     // Handle update submit
     if ($_SERVER["REQUEST_METHOD"] == "POST") {
-        $name = $_POST["name"];
-        $location = $_POST["location"];
-        $city = $_POST["city"];
-        $cover_image = $_POST["cover_image"];
-        $excerpt = $_POST["excerpt"];
-        $description = $_POST["description"];
-        $conclusion = $_POST["conclusion"];
-        $instagram = $_POST["instagram"];
-        $website = $_POST["website"];
-        $meta_title = $_POST["meta_title"];
-        $meta_description = $_POST["meta_desc"];
-        $meta_keywords = $_POST["meta_keywords"];
-
-        $published = $_POST["published"] === "true" ? 1 : 0;
-
-        $old_slug = $coffee["slug"];
-
-        // only generate slug if name changed
-        if ($coffee["name"] !== $name) {
-            $new_slug = createSlug($name);
-
-            updateCoffee($old_slug, $new_slug, $id);
-        } else {
-            $new_slug = $old_slug;
-        }
-
-        $sql = "
-            UPDATE drink_coffee
-            SET
-                name = :name,
-                slug = :slug,
-                location = :location,
-                city = :city,
-                cover_image = :cover_image,
-                excerpt = :excerpt,
-                description = :description,
-                conclusion = :conclusion,
-                instagram = :instagram,
-                website = :website,
-                meta_title = :meta_title,
-                meta_description = :meta_description,
-                meta_keywords = :meta_keywords,
-                published = :published
-            WHERE id = :id
-        ";
-
         try {
+            $pdo->beginTransaction();
+
+            $name = trim($_POST["name"]);
+            $location = trim($_POST["location"]);
+            $city = trim($_POST["city"]);
+            $cover_image = trim($_POST["cover_image"]);
+            $excerpt = $_POST["excerpt"];
+            $description = $_POST["description"];
+            $conclusion = $_POST["conclusion"];
+            $instagram = $_POST["instagram"];
+            $website = $_POST["website"];
+            $meta_title = $_POST["meta_title"];
+            $meta_description = $_POST["meta_desc"];
+            $meta_keywords = $_POST["meta_keywords"];
+            $published = (int) $_POST["published"];
+
+            $old_slug = $coffee["slug"];
+            $old_published_state = (int) $coffee["published"];
+
+            $new_slug = $old_slug;
+
+            if ($coffee["name"] !== $name) {
+                $new_slug = createSlug($name);
+            }
+
+            $sql = "
+                    UPDATE drink_coffee
+                    SET
+                        name = :name,
+                        slug = :slug,
+                        location = :location,
+                        city = :city,
+                        cover_image = :cover_image,
+                        excerpt = :excerpt,
+                        description = :description,
+                        conclusion = :conclusion,
+                        instagram = :instagram,
+                        website = :website,
+                        meta_title = :meta_title,
+                        meta_description = :meta_description,
+                        meta_keywords = :meta_keywords,
+                        published = :published
+                    WHERE id = :id
+                ";
+
             $stmt = $pdo->prepare($sql);
 
             $stmt->execute([
@@ -1251,10 +1220,23 @@ function edit()
                 ":id" => $id,
             ]);
 
+            if (
+                $coffee["name"] !== $name ||
+                $old_published_state !== $published
+            ) {
+                updateCoffee($old_slug, $new_slug, $id, $published);
+            }
+
+            $pdo->commit();
+
             header("Location: $admin");
             exit();
-        } catch (PDOException $e) {
-            echo "Database Error: " . $e->getMessage();
+        } catch (Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+
+            echo "Update failed: " . $e->getMessage();
         }
     }
 
@@ -1307,11 +1289,11 @@ function edit()
                             id="publish"
                             class="w-full rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-white outline-none transition focus:border-emerald-500"
                         >
-                            <option value="true" $publishSelected>
+                            <option value="1" $publishSelected>
                                 Publish
                             </option>
 
-                            <option value="false" $draftSelected>
+                            <option value="0" $draftSelected>
                                 Draft
                             </option>
 
@@ -1567,25 +1549,25 @@ function readCoffee()
     return json_decode($data, true) ?? [];
 }
 
-function addCoffee($id, $coffee_slug)
+function addCoffee($id, $coffee_slug, $published)
 {
     $coffee = readCoffee();
-    $coffee[$coffee_slug] = $id; // slug as key, id as value
+    $coffee[$coffee_slug] = [$id, $published]; // slug as key, id and published state as value
     $data = json_encode($coffee, JSON_THROW_ON_ERROR);
     if (file_put_contents("coffee.json", $data) === false) {
         throw new RuntimeException("Failed to update coffee.json");
     }
 }
 
-function updateCoffee($old_slug, $new_slug, $id)
+function updateCoffee($old_slug, $new_slug, $id, $published)
 {
     $coffee = readCoffee();
     if (!isset($coffee[$old_slug])) {
         return false;
     }
-    unset($coffee[$old_slug]); // remove old slug
-    $coffee[$new_slug] = $id; // add new slug
-    file_put_contents("coffee.json", json_encode($coffee, JSON_PRETTY_PRINT));
+    unset($coffee[$old_slug]);
+    $coffee[$new_slug] = [$id, $published]; // add new slug
+    file_put_contents("coffee.json", json_encode($coffee, JSON_THROW_ON_ERROR));
     return true;
 }
 
@@ -1596,82 +1578,9 @@ function deleteCoffee($slug)
         return false;
     }
     unset($coffee[$slug]);
-    file_put_contents("coffee.json", json_encode($coffee, JSON_PRETTY_PRINT));
+    file_put_contents("coffee.json", json_encode($coffee, JSON_THROW_ON_ERROR));
     return true;
 }
-
-//json for shop data
-function AddCoffeeShop(
-    $slug,
-    $id,
-    $name,
-    $location,
-    $city,
-    $cover_image,
-    $excerpt,
-    $description,
-    $conclusion,
-    $instagram,
-    $website,
-    $meta_title,
-    $meta_description,
-    $meta_keywords,
-    $published,
-    $created_at,
-    $updated_at,
-) {
-    $directory = __DIR__ . "/hotcoffee";
-
-    if (!is_dir($directory)) {
-        mkdir($directory, 0755, true);
-    }
-
-    $shopPath = "$directory/$id.json";
-
-    $data = [
-        "slug" => $slug,
-        "id" => $id,
-        "name" => $name,
-        "location" => $location,
-        "city" => $city,
-        "cover_image" => $cover_image,
-        "excerpt" => $excerpt,
-        "description" => $description,
-        "conclusion" => $conclusion,
-        "instagram" => $instagram,
-        "website" => $website,
-        "meta_title" => $meta_title,
-        "meta_description" => $meta_description,
-        "meta_keywords" => $meta_keywords,
-        "published" => $published,
-        "created_at" => $created_at,
-        "updated_at" => $updated_at,
-    ];
-
-    if (!file_exists($shopPath)) {
-        $json = json_encode($data, JSON_UNESCAPED_SLASHES);
-
-        if ($json === false) {
-            throw new RuntimeException(
-                "JSON encoding failed: " . json_last_error_msg(),
-            );
-        }
-
-        if (file_put_contents($shopPath, $json) === false) {
-            throw new RuntimeException("Failed to write file: {$shopPath}");
-        }
-
-        return true;
-    } else {
-        throw new RuntimeException("file already exists");
-    }
-}
-
-function UpdateCoffeeShop() {}
-
-function GetCoffeeShop($slug) {}
-
-function DeleteCoffeeShop() {}
 ?>
 
 

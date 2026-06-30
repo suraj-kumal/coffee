@@ -161,6 +161,7 @@ function home($page = 1)
         $stmt = $pdo->prepare("
             SELECT id, name, location, city, cover_image, slug, excerpt
             FROM drink_coffee
+            WHERE published = 1
             ORDER BY id DESC
             LIMIT :limit OFFSET :offset
         ");
@@ -240,7 +241,7 @@ function home($page = 1)
     */
 
     $head = "
-        <title>Coffeemandu</title>
+        <title>Hidden Beans</title>
     ";
 
     $body = "
@@ -261,7 +262,6 @@ function cityBased($slug)
     //city logic
     $head = <<<HTML
     <title>Best Coffee shops in $slug</title>
-
     HTML;
 
     $body = <<<HTML

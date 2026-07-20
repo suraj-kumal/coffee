@@ -424,10 +424,7 @@ function slugBased($slug)
       background: #EFEAE2;
     }
     .hb-rule { background-color: #2B1B12; }
-    .hb-mono {
-      font-family: ui-monospace, "SF Mono", "Roboto Mono", Menlo, Consolas, monospace;
-      letter-spacing: 0.14em;
-    }
+
 
     /* Prose block for TinyMCE description/conclusion content */
     .hb-prose {
@@ -474,8 +471,8 @@ function slugBased($slug)
 
             <!-- Masthead: flat, ruled, no gradients — Swiss grid discipline -->
             <header class="border-b-2 border-[#2B1B12] px-6 md:px-12 py-4 flex items-center justify-between">
-                <a href="/" class="hb-mono text-xs font-bold uppercase text-[#2B1B12]">Hidden Beans</a>
-                <p class="hb-mono text-xs font-bold uppercase text-[#B23A2E]">{$city}</p>
+                <a href="/" class="text-xs font-bold uppercase text-[#2B1B12]">Hidden Beans</a>
+                <p class="text-xs font-bold uppercase text-[#B23A2E]">{$city}</p>
             </header>
 
             <!-- Hero: image as object, title set below on grid baseline, flat (no overlay gradient) -->
@@ -485,7 +482,7 @@ function slugBased($slug)
                 </div>
                 <div class="px-6 md:px-12 py-8 md:py-10">
                     <div class="max-w-6xl mx-auto">
-                        <p class="hb-mono text-xs font-bold text-[#B23A2E] mb-3">Coffee Shop — {$city}</p>
+                        <p class="text-xs font-bold text-[#B23A2E] mb-3">Coffee Shop — {$city}</p>
                         <h1 class="text-5xl md:text-8xl font-black tracking-tight leading-[0.88] text-[#2B1B12]">{$name}</h1>
                     </div>
                 </div>
@@ -495,19 +492,19 @@ function slugBased($slug)
             <section class="px-6 md:px-12 border-b-2 border-[#2B1B12]">
                 <div class="max-w-6xl mx-auto grid grid-cols-2 md:grid-cols-4">
                     <div class="py-6 md:pr-8 border-b md:border-b-0 md:border-r border-[#2B1B12]/20">
-                        <p class="hb-mono text-[10px] font-bold text-[#8C7B6B] mb-2">01 — Location</p>
+                        <p class="text-[10px] font-bold text-[#8C7B6B] mb-2">01 — Location</p>
                         <p class="text-[#2B1B12] font-sans text-sm md:text-base">{$location}</p>
                     </div>
                     <div class="py-6 md:px-8 border-b md:border-b-0 md:border-r border-[#2B1B12]/20">
-                        <p class="hb-mono text-[10px] font-bold text-[#8C7B6B] mb-2">02 — City</p>
+                        <p class="text-[10px] font-bold text-[#8C7B6B] mb-2">02 — City</p>
                         <p class="text-[#2B1B12] font-sans text-sm md:text-base">{$city}</p>
                     </div>
                     <div class="py-6 md:px-8 border-b md:border-b-0 md:border-r border-[#2B1B12]/20">
-                        <p class="hb-mono text-[10px] font-bold text-[#8C7B6B] mb-2">03 — Updated</p>
+                        <p class="text-[10px] font-bold text-[#8C7B6B] mb-2">03 — Updated</p>
                         <p class="text-[#2B1B12] font-sans text-sm md:text-base">{$updatedTime}</p>
                     </div>
                     <div class="py-6 md:pl-8">
-                        <p class="hb-mono text-[10px] font-bold text-[#8C7B6B] mb-2">04 — Links</p>
+                        <p class="text-[10px] font-bold text-[#8C7B6B] mb-2">04 — Links</p>
                         <div class="flex flex-col gap-1">
         HTML;
 
@@ -542,8 +539,8 @@ function slugBased($slug)
             <!-- Footer nav: flat rule, mono label -->
             <section class="px-6 md:px-12 pb-16">
                 <div class="max-w-6xl mx-auto pt-8 border-t-2 border-[#2B1B12] flex items-center justify-between">
-                    <a href="/" class="hb-mono text-xs font-bold text-[#2B1B12] hover:text-[#B23A2E] transition-colors">&larr; Back to Directory</a>
-                    <p class="hb-mono text-xs font-bold text-[#8C7B6B]">Hidden Beans</p>
+                    <a href="/" class="text-xs font-bold text-[#2B1B12] hover:text-[#B23A2E] transition-colors">&larr; Back to Directory</a>
+                    <p class="text-xs font-bold text-[#8C7B6B]">Hidden Beans</p>
                 </div>
             </section>
 

@@ -11,9 +11,11 @@ $create_admin_route = "/admin/create";
 $edit_admin_route = "/admin/edit";
 $admin_user = "admin";
 $admin_pass = "secret123";
+$site_url = "https://coffee.local";
+$which_city = ["kathmandu", "pokhara"];
 //DATABASE
 
-
+/**
 $host = "localhost:3306";
 $db = "coffee";
 $user = "root";
@@ -33,7 +35,24 @@ try {
 } catch (\PDOException $e) {
     //throw new \PDOException($e->getMessage(), (int) $e->getCode());
     [$head_on_route, $body_on_route] = fiveHundred();
+}**/
+
+
+$db = __DIR__ . "/coffee.sqlite";
+$options = [
+    PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+    PDO::ATTR_EMULATE_PREPARES => false,
+];
+
+try {
+    $pdo = new PDO("sqlite:$db", null, null, $options);
+    // echo "Connected successfully";
+} catch (\PDOException $e) {
+    [$head_on_route, $body_on_route] = fiveHundred();
 }
+
+
 
 session_start();
 
@@ -73,7 +92,9 @@ switch ($uri) {
 //Middleware
 function coffee($slug)
 {
-    $which_city = ["kathmandu", "pokhara"];
+
+    global $which_city;
+   // $which_city = ["kathmandu", "pokhara"];
     $citypage = 1;
 
 
@@ -83,7 +104,7 @@ function coffee($slug)
 
 
     if (count($parts) > 1) {
-           $city = $parts[0];
+          $city = $parts[0];
            $citypage = $parts[1];
 
            if (!is_numeric($citypage) || (int)$citypage < 1) {
@@ -142,6 +163,7 @@ function authGuard()
 function home($page = 1)
 {
     global $pdo;
+    global $site_url;
     $perPage = 7;
     $page = max(1, (int) $page);
     $offset = ($page - 1) * $perPage;
@@ -162,7 +184,7 @@ function home($page = 1)
             ORDER BY
                 CASE WHEN priority IS NULL THEN 1 ELSE 0 END,
                 priority DESC,
-                RAND()
+                RANDOM()
             LIMIT :limit OFFSET :offset
         ");
 
@@ -170,7 +192,8 @@ function home($page = 1)
         $stmt->bindValue(":offset", $offset, PDO::PARAM_INT);
         $stmt->execute();
         $coffees = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    } catch (Exception $e) {
+  } catch (Exception $e) {
+        echo $e;
         return fourZeroFour();
     }
 
@@ -198,9 +221,43 @@ function home($page = 1)
     }
     $pagination .= "</nav>";
 
-    $head = "
+    /*$head = "
         <title>Hidden Beans</title>
-    ";
+    ";*/
+
+  $head = "
+    <title>Hidden Beans - Discover Coffee Shops Across Nepal</title>
+
+    <meta charset=\"UTF-8\">
+    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">
+
+    <meta name=\"description\" content=\"Discover coffee shops across Nepal with Hidden Beans. Explore cafés by location, view photos and maps, and find addresses, phone numbers, and social links.\">
+
+    <meta name=\"robots\" content=\"index, follow\">
+    <meta name=\"author\" content=\"Hidden Beans\">
+
+    <!-- Canonical -->
+    <link rel=\"canonical\" href=\"{$site_url}/\">
+
+    <!-- Open Graph -->
+    <meta property=\"og:type\" content=\"website\">
+    <meta property=\"og:title\" content=\"Hidden Beans — Discover Coffee Shops Across Nepal\">
+    <meta property=\"og:description\" content=\"Discover coffee shops across Nepal. Explore café listings, locations, photos, maps, phone numbers, and social links with Hidden Beans.\">
+    <meta property=\"og:url\" content=\"https://YOUR-DOMAIN.com/\">
+    <meta property=\"og:site_name\" content=\"Hidden Beans\">
+    <meta property=\"og:locale\" content=\"en_NP\">
+    <meta property=\"og:image\" content=\"https://YOUR-DOMAIN.com/images/og-image.jpg\">
+    <meta property=\"og:image:alt\" content=\"Hidden Beans — Discover Coffee Shops Across Nepal\">
+
+    <!-- Twitter / X -->
+    <meta name=\"twitter:card\" content=\"summary_large_image\">
+    <meta name=\"twitter:title\" content=\"Hidden Beans — Discover Coffee Shops Across Nepal\">
+    <meta name=\"twitter:description\" content=\"Discover coffee shops across Nepal. Find cafés, locations, photos, maps, phone numbers, and social links.\">
+    <meta name=\"twitter:image\" content=\"https://YOUR-DOMAIN.com/images/og-image.jpg\">
+
+    <!-- Theme -->
+    <meta name=\"theme-color\" content=\"#3B2416\">
+";
 
     $body = "
         <section class='border-b border-[#2B1B12]/15 px-6 md:px-12 py-16 md:py-24 bg-[#EFEAE2]'>
@@ -287,7 +344,7 @@ function cityBased($slug, $cityPage)
         $countStmt->execute([':slug' => $slug]);
         $totalRows = $countStmt->fetchColumn();
 
-        if ((int) $totalRows == 0) {
+    if ((int) $totalRows == 0) {
             return fourZeroFour();
         }
 
@@ -304,7 +361,7 @@ function cityBased($slug, $cityPage)
             ORDER BY
                 CASE WHEN priority IS NULL THEN 1 ELSE 0 END,
                 priority DESC,
-                RAND()
+                RANDOM()
             LIMIT :limit OFFSET :offset
         ");
         $stmt->bindValue(":slug", $slug, PDO::PARAM_STR);
@@ -312,7 +369,8 @@ function cityBased($slug, $cityPage)
         $stmt->bindValue(":offset", $offset, PDO::PARAM_INT);
         $stmt->execute();
         $coffees = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    } catch (Exception $e) {
+  } catch (Exception $e) {
+        echo $e;
         return fourZeroFour();
     }
 
@@ -374,6 +432,7 @@ function cityBased($slug, $cityPage)
 function slugBased($slug)
 {
     global $pdo;
+    global $site_url;
 
     try {
         $stmt = $pdo->prepare(
@@ -417,6 +476,7 @@ function slugBased($slug)
     <meta property="og:image:height" content="627">
     <meta property="og:type" content="article">
     <meta name="twitter:card" content="summary_large_image">
+    <link rel="canonical" href="{$site_url}/{$slug}" />
     <style>
     /* Swiss / International Typographic Style base */
     .hb-page {
@@ -477,16 +537,19 @@ function slugBased($slug)
 
             <!-- Hero: image as object, title set below on grid baseline, flat (no overlay gradient) -->
             <section class="border-b-2 border-[#2B1B12]">
-                <div class="h-[38vh] md:h-[48vh] w-full overflow-hidden">
+                <div class="h-[25vh] md:h-[38vh] lg:h-[85vh] w-full overflow-hidden">
                     <img src="{$cover_image}" alt="{$name}" width="1200" height="627" class="w-full h-full object-cover grayscale">
                 </div>
                 <div class="px-6 md:px-12 py-8 md:py-10">
                     <div class="max-w-6xl mx-auto">
                         <p class="text-xs font-bold text-[#B23A2E] mb-3">Coffee Shop — {$city}</p>
-                        <h1 class="text-5xl md:text-8xl font-black tracking-tight leading-[0.88] text-[#2B1B12]">{$name}</h1>
+                        <h1 class="text-5xl md:text-5xl lg:text-6xl font-black tracking-tight leading-[0.88] text-[#2B1B12]">{$name}</h1>
                     </div>
                 </div>
             </section>
+
+
+
 
             <!-- Meta grid: strict columns, ruled dividers, numeric/mono labels -->
             <section class="px-6 md:px-12 border-b-2 border-[#2B1B12]">
@@ -526,7 +589,7 @@ function slugBased($slug)
 
             <!-- Editorial body: single strict column, generous margins, ruled break -->
             <section class="px-6 md:px-12 py-14 md:py-20">
-                <div class="max-w-3xl mx-auto">
+                <div class="max-w-5xl mx-auto">
                     <div class="hb-prose">
                         {$description}
                     </div>
@@ -539,7 +602,7 @@ function slugBased($slug)
             <!-- Footer nav: flat rule, mono label -->
             <section class="px-6 md:px-12 pb-16">
                 <div class="max-w-6xl mx-auto pt-8 border-t-2 border-[#2B1B12] flex items-center justify-between">
-                    <a href="/" class="text-xs font-bold text-[#2B1B12] hover:text-[#B23A2E] transition-colors">&larr; Back to Directory</a>
+                    <a href="/" class="text-xs font-bold text-[#2B1B12] hover:text-[#B23A2E] transition-colors">Back to Directory</a>
                     <p class="text-xs font-bold text-[#8C7B6B]">Hidden Beans</p>
                 </div>
             </section>
@@ -551,17 +614,165 @@ function slugBased($slug)
 }
 
 //404
-function fourZeroFour()
+/*function fourZeroFour()
 {
     $head = "";
     $body = <<<HTML
         <h1>404 not found <h1>
     HTML;
     return [$head, $body];
+}*/
+
+function fourZeroFour()
+{
+    $head = <<<HTML
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    HTML;
+
+    $body = <<<HTML
+        <div class="min-h-screen flex flex-col bg-[#FAFAF8] text-[#111110] antialiased">
+
+            <!-- Header -->
+          <header class="border-b border-[#D8D7D0] px-6 py-5 flex items-center justify-between">
+            <a href="/" class="no-underline">
+                <span class="font-mono text-[0.7rem] tracking-[0.14em] uppercase">
+                    HIDDEN BEANS
+              </span>
+              </a>
+
+                <span class="font-mono text-[0.7rem] tracking-[0.14em] uppercase text-[#5B5B56]">
+                    ERROR — 404
+                </span>
+            </header>
+
+            <!-- Main -->
+            <main class="flex-1 flex items-center justify-center px-6 py-8">
+                <div class="w-full max-w-[420px] text-center">
+
+                    <!-- Status -->
+                    <span class="block mb-6 font-mono text-xs tracking-[0.1em] uppercase text-[#D71920]">
+                        STATUS — NOT FOUND
+                    </span>
+
+                    <!-- 404 -->
+                    <h1 class="m-0 font-extrabold tracking-[-0.03em] leading-[0.9] text-[clamp(4rem,14vw,6.5rem)]">
+                        4<span class="text-[#D71920]">0</span>4
+                    </h1>
+
+                    <!-- Robot -->
+                    <div
+                        id="bot"
+                        role="button"
+                        tabindex="0"
+                        aria-label="Ask the robot why the page is missing"
+                        class="relative w-[100px] h-[80px] mx-auto mt-8 mb-2 bg-[#111110] border border-[#111110] cursor-pointer transition-transform duration-300 ease-in-out hover:rotate-[3deg] hover:scale-[1.04]"
+                    >
+                        <div class="absolute top-6 left-[26px] w-[10px] h-[10px] bg-[#D71920]"></div>
+
+                        <div class="absolute top-6 right-[26px] w-[10px] h-[10px] bg-[#D71920]"></div>
+
+                        <div class="absolute bottom-5 left-[33px] w-[34px] h-[6px] bg-[#FAFAF8]"></div>
+                    </div>
+
+                    <!-- Description -->
+                    <p class="mt-5 text-base leading-[1.6] text-[#5B5B56]">
+                        This page went on vacation.<br>
+                        We checked everywhere. Even under the keyboard.
+                    </p>
+
+                    <!-- Button -->
+                    <button
+                        type="button"
+                        onclick="findPage()"
+                        class="mt-8 border border-[#111110] bg-[#111110] text-[#FAFAF8] font-mono text-xs tracking-[0.1em] uppercase px-7 py-3.5 cursor-pointer transition-colors duration-150 hover:bg-[#FAFAF8] hover:text-[#111110] focus:outline-none focus:ring-2 focus:ring-[#D71920] focus:ring-offset-2"
+                    >
+                        Ask the robot
+                    </button>
+
+                    <!-- Message -->
+                    <div
+                        id="message"
+                        class="mt-4 min-h-6 font-mono text-xs text-[#5B5B56]"
+                        aria-live="polite"
+                    ></div>
+
+                </div>
+            </main>
+        </div>
+
+        <style>
+            @keyframes shake {
+                0%, 100% {
+                    transform: translateX(0);
+                }
+                25% {
+                    transform: translateX(-8px);
+                }
+                75% {
+                    transform: translateX(8px);
+                }
+            }
+
+            .shake {
+                animation: shake 0.4s;
+            }
+
+            @media (prefers-reduced-motion: reduce) {
+                .shake {
+                    animation: none;
+                }
+
+                #bot {
+                    transition: none;
+                }
+            }
+
+            ::selection {
+                background: #D71920;
+                color: #fff;
+            }
+        </style>
+
+        <script>
+            const messages = [
+                "Robot says: Nope. Still missing.",
+                "I searched the internet. It was awkward.",
+                "The page is probably hiding from responsibility.",
+                "404 detected. Snacks recommended.",
+                "Maybe the page needs a GPS?"
+            ];
+
+            function findPage() {
+                const bot = document.getElementById("bot");
+                const msg = document.getElementById("message");
+
+                bot.classList.remove("shake");
+
+                void bot.offsetWidth;
+
+                bot.classList.add("shake");
+
+                msg.textContent =
+                    messages[Math.floor(Math.random() * messages.length)];
+            }
+
+            document.getElementById("bot").addEventListener("keydown", function(event) {
+                if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    findPage();
+                }
+            });
+        </script>
+    HTML;
+
+    return [$head, $body];
 }
 
+
 //500
-function fiveHundred()
+/*function fiveHundred()
 {
     $head = <<<HTML
         <title>Internal Server Error </title>
@@ -572,7 +783,199 @@ function fiveHundred()
     HTML;
 
     return [$head, $body];
+}*/
+
+function fiveHundred()
+{
+    $head = <<<HTML
+        <title>500 - Server Error</title>
+
+        <style>
+            @keyframes glitch {
+                0%, 100% {
+                    transform: translateX(0);
+                    background-color: #111110;
+                }
+
+                20% {
+                    transform: translateX(-6px);
+                    background-color: #D71920;
+                }
+
+                40% {
+                    transform: translateX(5px);
+                    background-color: #111110;
+                }
+
+                60% {
+                    transform: translateX(-4px);
+                    background-color: #D71920;
+                }
+
+                80% {
+                    transform: translateX(3px);
+                    background-color: #111110;
+                }
+            }
+
+            .animate-glitch {
+                animation: glitch 0.4s;
+            }
+
+            @media (prefers-reduced-motion: reduce) {
+                .animate-glitch {
+                    animation: none;
+                }
+            }
+
+            * {
+                border-radius: 0 !important;
+            }
+
+            ::selection {
+                background: #D71920;
+                color: #fff;
+            }
+        </style>
+    HTML;
+
+    $body = <<<HTML
+        <div class="min-h-screen flex flex-col bg-[#FAFAF8] text-[#111110] antialiased">
+
+            <!-- Header -->
+            <header class="border-b border-[#D8D7D0] px-6 py-5 flex items-center justify-between">
+                <span class="font-mono text-[0.7rem] tracking-[0.14em] uppercase">
+                    SANO.REDIRECTME.NET
+                </span>
+
+                <span class="font-mono text-[0.7rem] tracking-[0.14em] uppercase text-[#5B5B56]">
+                    ERROR — 500
+                </span>
+            </header>
+
+            <!-- Main -->
+            <main class="flex-1 flex items-center justify-center px-6 py-8">
+                <div class="w-full max-w-[420px] text-center">
+
+                    <!-- Status -->
+                    <span class="block mb-6 font-mono text-xs tracking-[0.1em] uppercase text-[#D71920]">
+                        STATUS — SERVER ERROR
+                    </span>
+
+                    <!-- 500 -->
+                    <h1 class="m-0 font-extrabold tracking-[-0.03em] leading-[0.9] text-[clamp(4rem,14vw,6.5rem)]">
+                        5<span class="text-[#D71920]">0</span>0
+                    </h1>
+
+                    <!-- Robot -->
+                    <div
+                        id="bot"
+                        role="button"
+                        tabindex="0"
+                        aria-label="Reboot the robot"
+                        class="relative w-[100px] h-[80px] mx-auto mt-8 mb-2 bg-[#111110] border border-[#111110] cursor-pointer transition-transform duration-300 ease-in-out hover:rotate-[-4deg] hover:scale-105"
+                    >
+
+                        <!-- Left Eye -->
+                        <div class="absolute top-7 left-6 w-3 h-0.5 bg-[#D71920] rotate-45">
+                            <div class="absolute w-3 h-0.5 bg-[#D71920] -rotate-90"></div>
+                        </div>
+
+                        <!-- Right Eye -->
+                        <div class="absolute top-7 right-6 w-3 h-0.5 bg-[#D71920] -rotate-45">
+                            <div class="absolute w-3 h-0.5 bg-[#D71920] -rotate-90"></div>
+                        </div>
+
+                        <!-- Mouth -->
+                        <div class="absolute bottom-6 left-[35px] w-[30px] h-0.5 bg-[#FAFAF8]"></div>
+                    </div>
+
+                    <!-- Description -->
+                    <p class="mt-5 text-base leading-[1.6] text-[#5B5B56]">
+                        Something broke on our end.<br>
+                        Not you. Definitely us this time.
+                    </p>
+
+                    <!-- Button -->
+                    <button
+                        id="reboot-button"
+                        type="button"
+                        class="border border-[#111110] bg-[#111110] text-[#FAFAF8] font-mono text-xs tracking-[0.1em] uppercase px-7 py-3.5 mt-8 cursor-pointer transition-colors duration-150 hover:bg-[#FAFAF8] hover:text-[#111110] focus:outline-2 focus:outline-[#D71920] focus:outline-offset-2"
+                    >
+                        Reboot the robot
+                    </button>
+
+                    <!-- Message -->
+                    <div
+                        id="message"
+                        class="min-h-6 mt-4 font-mono text-xs text-[#5B5B56]"
+                        aria-live="polite"
+                    ></div>
+
+                </div>
+            </main>
+        </div>
+
+        <script>
+            (() => {
+                const messages = [
+                    "Robot says: I panicked and forgot everything.",
+                    "500: my fault, not yours.",
+                    "Currently debugging myself.",
+                    "Give me a second, rebooting brain.",
+                    "Stack traces everywhere. Send help."
+                ];
+
+                const bot = document.getElementById("bot");
+                const button = document.getElementById("reboot-button");
+                const message = document.getElementById("message");
+
+                function rebootBot() {
+                    if (!bot || !message) {
+                        return;
+                    }
+
+                    // Restart animation
+                    bot.classList.remove("animate-glitch");
+
+                    void bot.offsetWidth;
+
+                    bot.classList.add("animate-glitch");
+
+                    // Random message
+                    message.textContent =
+                        messages[Math.floor(Math.random() * messages.length)];
+
+                    // Remove animation class after animation finishes
+                    setTimeout(() => {
+                        bot.classList.remove("animate-glitch");
+                    }, 400);
+                }
+
+                // Button click
+                if (button) {
+                    button.addEventListener("click", rebootBot);
+                }
+
+                // Robot click
+                if (bot) {
+                    bot.addEventListener("click", rebootBot);
+
+                    // Keyboard accessibility
+                    bot.addEventListener("keydown", (event) => {
+                        if (event.key === "Enter" || event.key === " ") {
+                            event.preventDefault();
+                            rebootBot();
+                        }
+                    });
+                }
+            })();
+        </script>
+    HTML;
+
+    return [$head, $body];
 }
+
 
 function admin()
 {
@@ -991,7 +1394,7 @@ function create()
                        meta_title,
                        meta_description,
                        meta_keywords,
-                       published
+                       published,
                        priority
                    )
                    VALUES (
@@ -1008,7 +1411,7 @@ function create()
                        :meta_title,
                        :meta_description,
                        :meta_keywords,
-                       :published
+                       :published,
                        :priority
                    )
                ";
@@ -1896,11 +2299,14 @@ function deleteCoffee($slug)
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
-        <link href="https://fonts.cdnfonts.com/css/akzidenzgrotesk" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Mozilla+Text:wght@200..700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css">
         <?php echo $head_on_route; ?>
         <style>
             body {
-                font-family: 'AkzidenzGrotesk', sans-serif;
+                font-family: 'Mozilla Text', sans-serif;
             }
         </style>
     </head>

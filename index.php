@@ -11,8 +11,8 @@ $create_admin_route = "/admin/create";
 $edit_admin_route = "/admin/edit";
 $admin_user = "admin";
 $admin_pass = "secret123";
-$site_url = "https://coffee.local";
-$which_city = ["kathmandu", "pokhara"];
+$site_url = "http://coffee.local";
+$which_city = ["kathmandu"];
 //DATABASE
 
 /**
@@ -164,6 +164,7 @@ function home($page = 1)
 {
     global $pdo;
     global $site_url;
+    global $which_city;
     $perPage = 7;
     $page = max(1, (int) $page);
     $offset = ($page - 1) * $perPage;
@@ -192,7 +193,7 @@ function home($page = 1)
         $stmt->bindValue(":offset", $offset, PDO::PARAM_INT);
         $stmt->execute();
         $coffees = $stmt->fetchAll(PDO::FETCH_ASSOC);
-  } catch (Exception $e) {
+    } catch (Exception $e) {
         echo $e;
         return fourZeroFour();
     }
@@ -225,7 +226,22 @@ function home($page = 1)
         <title>Hidden Beans</title>
     ";*/
 
-  $head = "
+    $cityNav = '';
+
+foreach ($which_city as $city) {
+    $cityNav .= <<<HTML
+        <a
+            href="/{$city}"
+            class="font-mono text-xs uppercase tracking-widest text-[#8C7B6B] hover:text-[#B23A2E] transition-colors"
+        >
+            {$city}
+        </a>
+HTML;
+}
+
+
+
+    $head = "
     <title>Hidden Beans - Discover Coffee Shops Across Nepal</title>
 
     <meta charset=\"UTF-8\">
@@ -246,14 +262,14 @@ function home($page = 1)
     <meta property=\"og:url\" content=\"https://YOUR-DOMAIN.com/\">
     <meta property=\"og:site_name\" content=\"Hidden Beans\">
     <meta property=\"og:locale\" content=\"en_NP\">
-    <meta property=\"og:image\" content=\"https://YOUR-DOMAIN.com/images/og-image.jpg\">
+    <meta property=\"og:image\" content=\"https://res.cloudinary.com/nlv1mapo/image/upload/v1789563169/cover_image.jpg\">
     <meta property=\"og:image:alt\" content=\"Hidden Beans — Discover Coffee Shops Across Nepal\">
 
     <!-- Twitter / X -->
     <meta name=\"twitter:card\" content=\"summary_large_image\">
     <meta name=\"twitter:title\" content=\"Hidden Beans — Discover Coffee Shops Across Nepal\">
     <meta name=\"twitter:description\" content=\"Discover coffee shops across Nepal. Find cafés, locations, photos, maps, phone numbers, and social links.\">
-    <meta name=\"twitter:image\" content=\"https://YOUR-DOMAIN.com/images/og-image.jpg\">
+    <meta name=\"twitter:image\" content=\"https://res.cloudinary.com/nlv1mapo/image/upload/v1789563169/cover_image.jpg\">
 
     <!-- Theme -->
     <meta name=\"theme-color\" content=\"#3B2416\">
@@ -272,7 +288,14 @@ function home($page = 1)
                 </div>
             </div>
         </section>
+            <section class='px-6 md:px-12 pt-8'>
+    <div class='max-w-6xl mx-auto'>
+        <nav class='flex flex-wrap gap-x-6 gap-y-3 border-b border-[#2B1B12]/20 pb-6'>
 
+            {$cityNav}
+        </nav>
+    </div>
+</section>
         <section class='px-6 md:px-12 pt-10'>
             <div class='max-w-6xl mx-auto'>
                 <div class='flex items-baseline justify-between border-b border-[#2B1B12] pb-3 mb-2 font-mono text-xs uppercase tracking-widest text-[#8C7B6B]'>
@@ -478,7 +501,6 @@ function slugBased($slug)
     <meta name="twitter:card" content="summary_large_image">
     <link rel="canonical" href="{$site_url}/{$slug}" />
     <style>
-    /* Swiss / International Typographic Style base */
     .hb-page {
       color: #2B1B12;
       background: #EFEAE2;
@@ -542,7 +564,7 @@ function slugBased($slug)
                 </div>
                 <div class="px-6 md:px-12 py-8 md:py-10">
                     <div class="max-w-6xl mx-auto">
-                        <p class="text-xs font-bold text-[#B23A2E] mb-3">Coffee Shop — {$city}</p>
+                        <p class="text-xs font-bold text-[#B23A2E] mb-3">Coffee Place — {$city}</p>
                         <h1 class="text-5xl md:text-5xl lg:text-6xl font-black tracking-tight leading-[0.88] text-[#2B1B12]">{$name}</h1>
                     </div>
                 </div>

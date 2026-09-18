@@ -6,12 +6,12 @@
 $head_on_route = "";
 $body_on_route = "";
 $admin = "/admin";
-$admin_login_route = "/adminlogin";
+$admin_login_route = "/admin/login";
 $create_admin_route = "/admin/create";
 $edit_admin_route = "/admin/edit";
 $admin_user = "admin";
 $admin_pass = "secret123";
-$site_url = "http://coffee.local";
+$site_url = "https://coffee.local";
 $which_city = ["kathmandu"];
 //DATABASE
 
@@ -66,6 +66,15 @@ switch ($uri) {
         $page = 1;
         [$head_on_route, $body_on_route] = home($page);
         break;
+    case "/sitemap.xml":
+        Sitemap($site_url, $which_city);
+        exit;
+
+    case "/robots.txt":
+        Robot();
+        exit;
+
+
 
     case $admin:
         [$head_on_route, $body_on_route] = admin();
@@ -144,13 +153,14 @@ function coffee($slug)
 
 function authGuard()
 {
-    global $admin_user;
+  global $admin_user;
+  global $admin_login_route;
     if (
         !isset($_SESSION["admin_logged_in"], $_SESSION["admin_username"]) ||
         ($_SESSION["admin_logged_in"] == !true &&
             $_SESSION["admin_username"] != $admin_user)
     ) {
-        header("Location: /adminlogin");
+        header("Location: $admin_login_route");
         exit();
     }
     return true;
@@ -242,7 +252,7 @@ HTML;
 
 
     $head = "
-    <title>Hidden Beans - Discover Coffee Shops Across Nepal</title>
+    <title>Hidden Beans - Discover Coffee Places Across Nepal</title>
 
     <meta charset=\"UTF-8\">
     <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">
@@ -421,9 +431,7 @@ function cityBased($slug, $cityPage)
     }
     $pagination .= "</nav>";
 
-    $head = "
-        <title>Hidden Beans in {$cityName}</title>
-    ";
+
 
     $body = "
         <section class='border-b border-[#2B1B12]/15 px-6 md:px-12 py-16 md:py-20 bg-[#EFEAE2]'>
@@ -447,7 +455,50 @@ function cityBased($slug, $cityPage)
         </section>
 
         {$pagination}
-    ";
+  ";
+     global $site_url;
+
+$cityName = strtolower(trim($cityName));
+
+$cityUrl = rtrim($site_url, '/') . '/' . rawurlencode($cityName);
+
+$pageTitle = "Best Coffee Shops in {$cityName}, Nepal | Hidden Beans";
+
+$pageDescription = "Discover coffee shops and cafés in {$cityName}, Nepal. Explore café locations, photos, maps, addresses, phone numbers, and social links with Hidden Beans.";
+
+$head = "
+    <title>" . htmlspecialchars($pageTitle, ENT_QUOTES, 'UTF-8') . "</title>
+
+    <meta charset=\"UTF-8\">
+    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">
+
+    <meta name=\"description\" content=\"" . htmlspecialchars($pageDescription, ENT_QUOTES, 'UTF-8') . "\">
+
+    <meta name=\"robots\" content=\"index, follow\">
+    <meta name=\"author\" content=\"Hidden Beans\">
+
+    <!-- Canonical -->
+    <link rel=\"canonical\" href=\"" . htmlspecialchars($cityUrl, ENT_QUOTES, 'UTF-8') . "\">
+
+    <!-- Open Graph -->
+    <meta property=\"og:type\" content=\"website\">
+    <meta property=\"og:title\" content=\"" . htmlspecialchars($pageTitle, ENT_QUOTES, 'UTF-8') . "\">
+    <meta property=\"og:description\" content=\"" . htmlspecialchars($pageDescription, ENT_QUOTES, 'UTF-8') . "\">
+    <meta property=\"og:url\" content=\"" . htmlspecialchars($cityUrl, ENT_QUOTES, 'UTF-8') . "\">
+    <meta property=\"og:site_name\" content=\"Hidden Beans\">
+    <meta property=\"og:locale\" content=\"en_NP\">
+    <meta property=\"og:image\" content=\"https://res.cloudinary.com/nlv1mapo/image/upload/v1789563169/cover_image.jpg\">
+    <meta property=\"og:image:alt\" content=\"Coffee shops in {$cityName}, Nepal — Hidden Beans\">
+
+    <!-- Twitter / X -->
+    <meta name=\"twitter:card\" content=\"summary_large_image\">
+    <meta name=\"twitter:title\" content=\"" . htmlspecialchars($pageTitle, ENT_QUOTES, 'UTF-8') . "\">
+    <meta name=\"twitter:description\" content=\"" . htmlspecialchars($pageDescription, ENT_QUOTES, 'UTF-8') . "\">
+    <meta name=\"twitter:image\" content=\"https://res.cloudinary.com/nlv1mapo/image/upload/v1789563169/cover_image.jpg\">
+
+    <!-- Theme -->
+    <meta name=\"theme-color\" content=\"#3B2416\">
+";
 
     return [$head, $body];
 }
@@ -1302,7 +1353,7 @@ function adminLogin()
             </div>
 
             <!-- Form -->
-            <form action="/adminlogin" method="POST" class="space-y-5">
+            <form action="/admin/login" method="POST" class="space-y-5">
 
                 <!-- Username -->
                 <div>
@@ -1367,7 +1418,7 @@ function logout()
         // Destroy only the specific admin session variables
         unset($_SESSION["admin_logged_in"]);
         unset($_SESSION["admin_username"]);
-        header("Location: /adminlogin");
+        header("Location: /admin/login");
         exit();
     }
 }
@@ -2267,6 +2318,56 @@ function edit()
     return [$head, $body];
 }
 
+
+function Sitemap($site_url, $which_city)
+{
+    $coffee = readCoffee();
+
+    $urls = [];
+
+    // Homepage
+    $urls[] = rtrim($site_url, '/');
+
+    // City URLs
+    foreach ($which_city as $city) {
+        $urls[] = rtrim($site_url, '/') . '/' . trim($city, '/');
+    }
+
+    // Coffee URLs
+    foreach ($coffee as $slug => $latte) {
+        $urls[] = rtrim($site_url, '/') . '/' . trim($slug, '/');
+    }
+
+    // XML
+    $xml = '<?xml version="1.0" encoding="UTF-8"?>';
+    $xml .= '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">';
+
+    foreach ($urls as $url) {
+        $xml .= '<url>';
+        $xml .= '<loc>' . htmlspecialchars($url, ENT_XML1, 'UTF-8') . '</loc>';
+        $xml .= '</url>';
+    }
+
+    $xml .= '</urlset>';
+
+    header('Content-Type: application/xml; charset=UTF-8');
+
+    echo $xml;
+}
+
+function robot()
+{
+    header('Content-Type: text/plain');
+
+    echo "User-agent: *\n";
+    echo "Disallow: /admin\n";
+    echo "Disallow: /admin/\n";
+}
+
+
+
+
+
 //JSON slugs
 function readCoffee()
 {
@@ -2309,6 +2410,7 @@ function deleteCoffee($slug)
     file_put_contents("coffee.json", json_encode($coffee, JSON_THROW_ON_ERROR));
     return true;
 }
+
 ?>
 
 
